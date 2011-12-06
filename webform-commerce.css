@@ -1,3 +1,17 @@
-form.commerce-webform {position: relative;}
+form.commerce-webform {
+  position: relative;
+}
 
-form.commerce-webform #cost {position:absolute; top:0; right:0; font-size: 20px;font-weight: bold;}
+form.commerce-webform #cost {
+  font-size: 20px;
+  font-weight: bold;
+  position:absolute;
+  right:0;
+  top:0;
+  padding: 0 30px;
+  background: #ececec;
+}
+
+form.commerce-webform .form-item {
+  overflow: hidden;
+}

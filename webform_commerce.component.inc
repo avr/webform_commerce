@@ -117,6 +117,7 @@ function _webform_render_commerce($component, $value = NULL, $filter = TRUE) {
  * Implements _webform_submit_component().
  */
 function _webform_submit_commerce($component, $value) {
+  // $value is set in the the custom form validate from webform_commerce.module
   $value = array_intersect_key($value, drupal_map_assoc(array(
     'total',
     'status',

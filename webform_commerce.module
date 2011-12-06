@@ -99,8 +99,8 @@ function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
     $component = $node->webform['components'][$commerce_cid];
 
     $base = $component['extra']['pricing']['base_price'];
-    
-    $total = !isset($form_state['values']) ? $base : $form_state['values']['submitted']['payment']['total'];
+
+    $total = !isset($form_state['total']) ? $base : $form_state['total'];
     
     // Add a class so we can add positioning to the form
     $form['#attributes']['class'][] = 'commerce-webform';
@@ -111,11 +111,17 @@ function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
 
         $parent_keys = webform_component_parent_keys($node, $price_component);
         $element = $form['submitted'];
+        
         foreach ($parent_keys as $form_key) {
           if (isset($element[$form_key])) {
+            $form['submitted'][$form_key]['#attributes']['class'][] = 'ajax-fix';
             $form['submitted'][$form_key]['#ajax'] = array(
               'callback' => 'webform_commerce_price_adjust', 
               'wrapper' => 'cost',
+              'progress' => array(
+                'type' => 'throbber',
+                'message' => NULL,
+              ),
             );
           }
           else {
@@ -128,9 +134,10 @@ function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
 
     $form['price'] = array(
       '#type' => 'item',
+      '#title' => t('Total'),
       '#prefix' => "<div id='cost'>",
       '#suffix' => '</div>',
-      '#markup' => "<h2>Cost</h2>$" . $total,
+      '#markup' => "$". $total,
     );
 
     // Check if the commerce component is on this page of the webform.
@@ -142,7 +149,6 @@ function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
         $element = $element[$form_key];
       }
       else {
-        $element = FALSE;
         break;
       }
     }
@@ -162,7 +168,15 @@ function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
  */
 
 function webform_commerce_price_adjust($form, $form_state) {
+  $element = array(
+    '#type' => 'item_list',
+    '#items' => array(
+      '0' => 'Test',
+      '2' => 'Test 2',
+    ),
+  );
   return $form['price'];
+  // return render($element);
 }
 
 
@@ -214,10 +228,12 @@ function webform_commerce_validate(&$form, &$form_state) {
       $price_component = $node->webform['components'][$cid];
       // Find the price value if on the current page.
       $price_value = _webform_commerce_component_value($node, $price_component, $form_state['values']['submitted'], TRUE);
+      
       // Find the price value from any previous pages.
       if ($price_value === FALSE && isset($form_state['storage']['submitted'])) {
-        $price_value = _webform_pay_component_value($node, $price_component, $form_state['storage']['submitted']);
+        $price_value = _webform_commerce_component_value($node, $price_component, $form_state['storage']['submitted']);
       }
+      
       $price_parents = webform_component_parent_keys($node, $price_component);
       if (!empty($price_value) && !is_numeric($price_value)) {
         form_set_error('submitted][' . implode('][', $price_parents), t('The value for @name needs to be a valid amount.', array('@name' => $price_component['name'])));
@@ -227,6 +243,7 @@ function webform_commerce_validate(&$form, &$form_state) {
       }
     }
   }
+  $form_state['total'] = $total;
   
   // Set the total for the payment. This total is the grand total of all payment
   // systems together. The pay_form class may validate this total.
@@ -235,16 +252,18 @@ function webform_commerce_validate(&$form, &$form_state) {
   $form_state['values']['webform_commerce']['total'] = $total;
   $form_state['values']['webform_commerce']['status'] = 'unpaid';
   
-  
-  // Drill down to the pay form element.
+  // Drill down to the commerce form element.
   $parent_keys = webform_component_parent_keys($node, $component);
   $element = &$form['submitted'];
   foreach ($parent_keys as $form_key) {
     $element = &$element[$form_key];
   }
   
-  // Set the component value so that it gets saved into the Webform table.
-  form_set_value($element, $form_state['values']['webform_commerce'], $form_state);
+  if ($element) {
+    // Set the component value so that it gets saved into the Webform table.
+    form_set_value($element, $form_state['values']['webform_commerce'], $form_state);
+  }
+  
 }
 
 /**
