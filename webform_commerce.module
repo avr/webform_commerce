@@ -1,0 +1,289 @@
+<?php
+/**
+ * @file
+ * This is the file description for Webform Commerce module.
+ *
+ * In this more verbose, multi-line description, you can specify what this
+ * file does exactly. Make sure to wrap your documentation in column 78 so
+ * that the file can be displayed nicely in default-sized consoles.
+ */
+
+/**
+ * Implements hook_webform_component_info
+ */
+function webform_commerce_webform_component_info() {
+  $components = array();
+
+  $components['commerce'] = array(
+    'label' => t('Commerce payment'),
+    'description' => t('Charges for webform submission.'),
+    'features' => array(
+      'conditional' => FALSE,
+      'required' => FALSE,
+      'title_display' => FALSE,
+    ),
+    'file' => 'webform_commerce.component.inc',
+  );
+
+  return $components;
+}
+
+/**
+ * The following items are taken directly from webform_pay
+ */
+
+/**
+ * Implements hook_webform_component_info_alter().
+ *
+ */
+function webform_commerce_webform_component_info_alter(&$components) {
+  // Allow components of these types to be used as a price field.
+  $components['textfield']['features']['price'] = TRUE;
+  $components['select']['features']['price'] = TRUE;
+  $components['hidden']['features']['price'] = TRUE;
+}
+
+/**
+ * Implements hook_webform_component_presave().
+ */
+function webform_commerce_webform_component_presave(&$component) {
+  // dsm($component);
+  // Register a pay_form entry for this pay component.
+  // if ($component['type'] == 'commerce') {
+  //   $pfid = $component['extra']['pfid'];
+  //   // $node = node_load($component['nid']);
+  //   // $pay = pay_form_load($pfid ? $pfid : 'webform_pay');
+  //   // $pay->uid = $node->uid;
+  //   // $pay->title = $node->title;
+  //   // $pay->menu_path = 'node/' . $node->nid;
+  //   // $pay->pay_methods = array($pmid => $pmid);
+  //   // $pay->save();
+  // 
+  //   // Update the component pay form ID.
+  //   // $component['extra']['pfid'] = $pay->pfid;
+  // }
+}
+
+/**
+ * Implements hook_node_load().
+ */
+function webform_commerce_node_load($nodes, $types) {
+  // Quick check to see if we need to do anything at all for these nodes.
+  $webform_types = webform_variable_get('webform_node_types');
+  if (count(array_intersect($types, $webform_types)) == 0) {
+    return;
+  }
+
+  // Select all webforms that match these node IDs.
+  $result = db_select('webform_component', 'wc')
+    ->fields('wc', array('nid', 'cid'))
+    ->condition('type', 'commerce')
+    ->condition('nid', array_keys($nodes), 'IN')
+    ->execute()
+    ->fetchAllKeyed();
+
+  foreach ($result as $nid => $cid) {
+    $nodes[$nid]->webform_commerce_cid = $cid;
+  }
+  
+}
+
+/**
+ * Implements hook_form_alter().
+ */
+function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
+  if (preg_match('/^webform_client_form_\d+$/', $form_id) && isset($form['#node']->webform_commerce_cid)) {
+    $node = $form['#node'];
+    
+    $commerce_cid = $node->webform_commerce_cid;
+    $component = $node->webform['components'][$commerce_cid];
+
+    $base = $component['extra']['pricing']['base_price'];
+    
+    $total = !isset($form_state['values']) ? $base : $form_state['values']['submitted']['payment']['total'];
+    
+    // Add a class so we can add positioning to the form
+    $form['#attributes']['class'][] = 'commerce-webform';
+    
+    foreach ($component['extra']['pricing']['price_components'] as $cid => $enabled) {
+      if ($enabled && isset($node->webform['components'][$cid])) {
+        $price_component = $node->webform['components'][$cid];
+
+        $parent_keys = webform_component_parent_keys($node, $price_component);
+        $element = $form['submitted'];
+        foreach ($parent_keys as $form_key) {
+          if (isset($element[$form_key])) {
+            $form['submitted'][$form_key]['#ajax'] = array(
+              'callback' => 'webform_commerce_price_adjust', 
+              'wrapper' => 'cost',
+            );
+          }
+          else {
+            $element = FALSE;
+            break;
+          }
+        }
+      }
+    }
+
+    $form['price'] = array(
+      '#type' => 'item',
+      '#prefix' => "<div id='cost'>",
+      '#suffix' => '</div>',
+      '#markup' => "<h2>Cost</h2>$" . $total,
+    );
+
+    // Check if the commerce component is on this page of the webform.
+    // @TODO - Is this necessary since our component is really only used on submit?
+    $parent_keys = webform_component_parent_keys($node, $component);
+    $element = $form['submitted'];
+    foreach ($parent_keys as $form_key) {
+      if (isset($element[$form_key])) {
+        $element = $element[$form_key];
+      }
+      else {
+        $element = FALSE;
+        break;
+      }
+    }
+
+    // Initialize the form for the selected payment method.
+    if ($element /* && $pay_form = pay_form_load($component['extra']['pfid']) */) {
+      // $form['#pre_render'][] = 'webform_pay_prerender';
+      $form['#validate'][] = 'webform_commerce_validate';
+      // $pay_form->form($form, $form_state, 'webform');
+      $form['#after_build'][] = 'webform_commerce_after_build';
+    }
+  }
+}
+
+/**
+ * Ajax callback to adjust the price display
+ */
+
+function webform_commerce_price_adjust($form, $form_state) {
+  return $form['price'];
+}
+
+
+/**
+ * After build function for webform commerce fields.
+ *
+ * Remove the extra fields that are not collected by Pay module directly.
+ */
+function webform_commerce_after_build($form) {
+  $node = $form['#node'];
+  $commerce_cid = $node->webform_commerce_cid;
+  $component = $node->webform['components'][$commerce_cid];
+
+  // If editing a submission, do NOT reprocess payment information. This
+  // information becomes display-only.
+  
+  // @TODO - Change this
+  if (!empty($form['#submission']->sid)) {
+    $submit_index = array_search('pay_submit', $form['#submit']);
+    $validate_index = array_search('pay_validate', $form['#validate']);
+    if ($submit_index !== FALSE) {
+      unset($form['#submit'][$submit_index]);
+    }
+    if ($validate_index !== FALSE) {
+      unset($form['#validate'][$validate_index]);
+    }
+  }
+
+  return $form;
+}
+
+/**
+ * Validation function for webforms that accept payment information.
+ *
+ * This is responsible for finding all the price fields within the webform and
+ * adding up all the totals. Currently either textfields or select lists may
+ * be used for prices.
+ */
+function webform_commerce_validate(&$form, &$form_state) {
+  $node = $form['#node'];
+  $commerce_cid = $node->webform_commerce_cid;
+  $component = $node->webform['components'][$commerce_cid];
+
+  // Add up all the components that contain price values.
+  $total = $component['extra']['pricing']['base_price'];
+  
+  foreach ($component['extra']['pricing']['price_components'] as $cid => $enabled) {
+    if ($enabled && isset($node->webform['components'][$cid])) {
+      $price_component = $node->webform['components'][$cid];
+      // Find the price value if on the current page.
+      $price_value = _webform_commerce_component_value($node, $price_component, $form_state['values']['submitted'], TRUE);
+      // Find the price value from any previous pages.
+      if ($price_value === FALSE && isset($form_state['storage']['submitted'])) {
+        $price_value = _webform_pay_component_value($node, $price_component, $form_state['storage']['submitted']);
+      }
+      $price_parents = webform_component_parent_keys($node, $price_component);
+      if (!empty($price_value) && !is_numeric($price_value)) {
+        form_set_error('submitted][' . implode('][', $price_parents), t('The value for @name needs to be a valid amount.', array('@name' => $price_component['name'])));
+      }
+      else {
+        $total += (float) $price_value;
+      }
+    }
+  }
+  
+  // Set the total for the payment. This total is the grand total of all payment
+  // systems together. The pay_form class may validate this total.
+  
+  // @TODO this needs to be changed to commerce
+  $form_state['values']['webform_commerce']['total'] = $total;
+  $form_state['values']['webform_commerce']['status'] = 'unpaid';
+  
+  
+  // Drill down to the pay form element.
+  $parent_keys = webform_component_parent_keys($node, $component);
+  $element = &$form['submitted'];
+  foreach ($parent_keys as $form_key) {
+    $element = &$element[$form_key];
+  }
+  
+  // Set the component value so that it gets saved into the Webform table.
+  form_set_value($element, $form_state['values']['webform_commerce'], $form_state);
+}
+
+/**
+ * Helper function to return the value of a component if it exists.
+ *
+ * @param $node
+ *   The Webform node.
+ * @param $component
+ *   The Webform component to check for.
+ * @param $values
+ *   An array of webform values keyed by component ID.
+ * @param $nested_tree
+ *   Whether or not this function should treat the $values parameter as a tree.
+ *   On same-page validation the form value is in a tree. On multiple page forms
+ *   or on submission, the values are flattened by Webform.
+ *
+ * @return
+ *   The submitted value of the component, or FALSE if the component was not
+ *   contained in $values.
+ */
+function _webform_commerce_component_value($node, $component, $values, $nested_tree = FALSE) {
+  $component_value = FALSE;
+  if ($nested_tree) {
+    $parent_keys = webform_component_parent_keys($node, $component);
+    $component_value = $values;
+    foreach ($parent_keys as $form_key) {
+      if (isset($component_value[$form_key])) {
+        $component_value = $component_value[$form_key];
+      }
+      else {
+        $component_value = FALSE;
+        break;
+      }
+    }
+  }
+  else {
+    $cid = $component['cid'];
+    $component_value = isset($values[$cid]) ? $values[$cid] : FALSE;
+  }
+
+  return $component_value;
+}

@@ -1,0 +1,28 @@
+name = Webform Commerce
+description = "Allows for charging for Webform submissions"
+
+; Core version (required)
+core = 7.x
+
+; Package name (see http://drupal.org/node/542202 for a list of names)
+; package = 
+
+; PHP version requirement (optional)
+; php = 5.2
+
+; Loadable code files
+files[] = webform_commerce.module
+; files[] = webform_commerce.admin.inc
+; files[] = webform_commerce.class.inc
+
+; Module dependencies
+dependencies[] = webform
+; dependencies[] = theirmodule (1.2)
+; dependencies[] = anothermodule (>=2.4)
+; dependencies[] = views (3.x)
+
+; Stylesheets
+stylesheets[all][] = webform-commerce.css
+
+; Configuration page
+; configure = admin/config/webform_commerce

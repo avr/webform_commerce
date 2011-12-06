@@ -1,0 +1,3 @@
+form.commerce-webform {position: relative;}
+
+form.commerce-webform #cost {position:absolute; top:0; right:0; font-size: 20px;font-weight: bold;}
