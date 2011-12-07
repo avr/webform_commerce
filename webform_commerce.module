@@ -93,6 +93,8 @@ function webform_commerce_node_load($nodes, $types) {
  */
 function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
   if (preg_match('/^webform_client_form_\d+$/', $form_id) && isset($form['#node']->webform_commerce_cid)) {
+    global $user;
+    
     $node = $form['#node'];
     
     $commerce_cid = $node->webform_commerce_cid;
@@ -113,8 +115,11 @@ function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
         $element = $form['submitted'];
         
         foreach ($parent_keys as $form_key) {
+
           if (isset($element[$form_key])) {
             $form['submitted'][$form_key]['#attributes']['class'][] = 'ajax-fix';
+            
+            // add ajax to each component that can alter price
             $form['submitted'][$form_key]['#ajax'] = array(
               'callback' => 'webform_commerce_price_adjust', 
               'wrapper' => 'cost',
@@ -159,6 +164,17 @@ function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
       $form['#validate'][] = 'webform_commerce_validate';
       // $pay_form->form($form, $form_state, 'webform');
       $form['#after_build'][] = 'webform_commerce_after_build';
+
+      // add a custom submit function to add the product to the cart
+      $form['#submit'][] = 'webform_commerce_submit';
+      
+      // Store the customer uid in the form so other modules can override with a
+      // selection widget if necessary.
+      $form['uid'] = array(
+        '#type' => 'value',
+        '#value' => $user->uid,
+      );
+      
     }
   }
 }
@@ -263,7 +279,89 @@ function webform_commerce_validate(&$form, &$form_state) {
     // Set the component value so that it gets saved into the Webform table.
     form_set_value($element, $form_state['values']['webform_commerce'], $form_state);
   }
+}
+
+
+/**
+ * Submit callback to add a product to the cart
+ * This is taken straight from commerce_cart_add_to_cart_form_submit
+ */
+
+function webform_commerce_submit(&$form, &$form_state) {
+  // $product_id = $form_state['values']['product_id'];
+  $product_id = '4';
+  $product = commerce_product_load($product_id);
+  dsm($product);
+
+  // Create the new product line item of the same type.
+  // $line_item = commerce_product_line_item_new($product, $form_state['values']['quantity'], 0, $form_state['line_item']->data, $form_state['line_item']->type);
+
+  $line_item = commerce_product_line_item_new($product, 1, 0, NULL, 'example_line_item_1');
+  dsm($line_item);
   
+  module_load_include('inc', 'commerce_line_item', 'commerce_line_item.rules');
+  commerce_line_item_unit_price_add($line_item, '450000', 'price_example_component', COMMERCE_ROUND_HALF_UP);
+
+  // Save the line item to get its ID.
+  // commerce_line_item_save($line_item);
+
+  // Allow modules to prepare this as necessary. This hook is defined by the
+  // Product Pricing module.
+  drupal_alter('commerce_product_calculate_sell_price_line_item', $line_item);
+  
+  // Remove line item field values the user didn't have access to modify.
+  // foreach ($form_state['values']['line_item_fields'] as $field_name => $value) {
+  //   // Note that we're checking the Commerce Cart settings that we inserted
+  //   // into this form element array back when we built the form. This means a
+  //   // module wanting to alter a line item field widget to be available must
+  //   // update both its form element's #access value and the field_access value
+  //   // of the #commerce_cart_settings array.
+  //   if (empty($form['line_item_fields'][$field_name]['#commerce_cart_settings']['field_access'])) {
+  //     unset($form_state['values']['line_item_fields'][$field_name]);
+  //   }
+  // }
+  
+  // Unset the line item field values array if it is now empty.
+  // if (empty($form_state['values']['line_item_fields'])) {
+  //   unset($form_state['values']['line_item_fields']);
+  // }
+  
+  // Add field data to the line item.
+  // field_attach_submit('commerce_line_item', $line_item, $form['line_item_fields'], $form_state);
+  
+  // Process the unit price through Rules so it reflects the user's actual
+  // purchase price.
+  rules_invoke_event('commerce_product_calculate_sell_price', $line_item);
+  
+  // Only attempt an Add to Cart if the line item has a valid unit price.
+  $line_item_wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
+  
+  if (!is_null($line_item_wrapper->commerce_unit_price->value())) {
+    // Add the product to the specified shopping cart.
+    $form_state['line_item'] = commerce_cart_product_add(
+      $form_state['values']['uid'],
+      $line_item,
+      FALSE
+    );
+  }
+  else {
+    drupal_set_message(t('%title could not be added to your cart.', array('%title' => $product->title)), 'error');
+  }
+  
+  dsm($form_state);
+}
+
+/**
+ * Implements hook_commerce_product_calculate_sell_price_line_item_alter().
+ */
+function webform_commerce_commerce_product_calculate_sell_price_line_item_alter($line_item) {
+  global $user;
+  dsm($user);
+
+  // Reference the current shopping cart order in the line item if it isn't set.
+  if (empty($line_item->order_id)) {
+    $line_item->order_id = commerce_cart_order_id($user->uid);
+  }
 }
 
 /**
