@@ -7,6 +7,48 @@
  * file does exactly. Make sure to wrap your documentation in column 78 so
  * that the file can be displayed nicely in default-sized consoles.
  */
+ 
+/**
+ * Implements hook_commerce_price_component_type_info().
+ */
+function webform_commerce_commerce_price_commerce_price_component_type_info() {
+  return array(
+    'webform_fee' => array(
+      'title' => t('Webform fee'),
+      'display_title' => t('Event Option'),
+      'weight' => -50,
+    ),
+  );
+}
+
+/**
+ * Implements hook_commerce_line_item_type_info().
+ *
+ * - webform_line_item is completely implemented and is not a product line
+ *   item type but rather a "surcharge", and the hook_commerce_order_presave()
+ *   is provided to make sure that there is one for every order.
+ *
+ * @see hook_commerce_line_item_type_info().
+ * @see http://www.drupalcommerce.org/specification/info-hooks/checkout
+ *
+ */
+function webform_commerce_commerce_line_item_type_info() {
+
+  $line_item_types['webform_commerce'] = array(
+    'name' => t('Webform extra fee'),
+    'description' => t('Simplest Example Line Item Type'),
+    'product' => FALSE,
+
+    // Here you can change the text in the submit button in the order admin form.
+    'add_form_submit_value' => t('Add webform extra charge'),
+
+    'base' => 'webform_commerce_line_item',
+  );
+
+  return $line_item_types;
+}
+
+
 
 /**
  * Implements hook_webform_component_info
@@ -104,6 +146,7 @@ function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
     if ($product = commerce_product_load_by_sku($component['extra']['pricing']['product_to_add'])) {
       $amount = commerce_product_calculate_sell_price($product);
       $form_state['base_price'] = $amount;
+      $form_state['product_id'] = $product->product_id;
     }
 
     $total = !isset($form_state['total']) ? $amount['amount'] : $form_state['total'];
@@ -130,7 +173,7 @@ function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
           
           foreach ($parent_keys as $form_key) {
             $title = $price_component['name'];
-            $value = isset($form_state['cost']['options'][$form_key]) ? $form_state['cost']['options'][$form_key] : '0';
+            $value = isset($form_state['cost']['options'][$form_key]['amount']) ? $form_state['cost']['options'][$form_key]['amount'] : '0';
 
             $form['cost'][$form_key] = array(
               '#type' => 'item',
@@ -170,7 +213,7 @@ function webform_commerce_price_adjust(&$form, $form_state) {
   // Adjust the display value of each line item
   $items = $form_state['cost']['options'];
   foreach($items as $k => $v) {
-    $line_item_amount = commerce_currency_format($v, 'USD');
+    $line_item_amount = commerce_currency_format($v['amount'], 'USD');
     $commands[] = ajax_command_html("#". $k, $line_item_amount);
   }
 
@@ -233,7 +276,8 @@ function webform_commerce_validate(&$form, &$form_state) {
       }
       
       $form_key = $price_component['form_key'];
-      $form_state['cost']['options'][$form_key] = (float) $price_value * 100;
+      $form_state['cost']['options'][$form_key]['amount'] = (float) $price_value * 100;
+      $form_state['cost']['options'][$form_key]['details'] = $price_component;
       
       $price_parents = webform_component_parent_keys($node, $price_component);
       if (!empty($price_value) && !is_numeric($price_value)) {
@@ -273,25 +317,38 @@ function webform_commerce_submit(&$form, &$form_state) {
   // Only submit the registration if the webform has been fully submitted
   if (!empty($form_state['values']['details']['sid'])) {
     global $user;
-    // $product_id = $form_state['values']['product_id'];
-    $product_id = '1';
-    $quantity = '1';
-    $combine = FALSE;
+    
+    if (isset($form_state['product_id'])) {
+      // $product_id = $form_state['values']['product_id'];
+      $product_id = $form_state['product_id'];
+      $quantity = '1';
+      $combine = FALSE;
+    }
     
     if ($line_item = commerce_cart_product_add_by_id($product_id, $quantity, $combine, $user->uid)) {
+      if (isset($form_state['cost']['options'])) {
+        // Wrap the order to simplify manipulating its field data.
+        $order = commerce_order_load($line_item->order_id);
+        $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+        
+        foreach ($form_state['cost']['options'] as $k) {
+          if ($k['amount'] > 0) {
+            $unit_price = array(
+              'amount' => $k['amount'],
+              'currency_code' => 'USD',
+              'data' => array(),
+            );
+            $new_line_item = webform_commerce_line_item_new($unit_price, $line_item->order_id, array(), $k['details']);
 
-      $new_line_item = my_special_function2($line_item->order_id);
-      
-      // Add the line item to the order using the wrapper.
-      // Wrap the order to simplify manipulating its field data.
-      $order = commerce_order_load($line_item->order_id);
-      $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+            commerce_line_item_save($new_line_item);
+            // Add the line item to the order using the wrapper.
+            $order_wrapper->commerce_line_items[] = $new_line_item;
+          }
+        }
 
-      $order_wrapper->commerce_line_items[] = $new_line_item;
-
-      // Save the order again to update its line item reference field.
-      commerce_order_save($order);
-      
+        // Save the order again to update its line item reference field.
+        commerce_order_save($order);
+      }
       drupal_set_message(t('Congrats'), 'status');
     }
     else {
@@ -300,35 +357,78 @@ function webform_commerce_submit(&$form, &$form_state) {
   }
 }
 
-function my_special_function2($order_id) {
+/**
+ * Creates a new product line item populated with the proper product values.
+ *
+ * @param $product
+ *   The fully loaded product referenced by the line item.
+ * @param $quantity
+ *   The quantity to set for the product.
+ * @param $order_id
+ *   The ID of the order the line item belongs to (if available).
+ * @param $data
+ *   A data array to set on the new line item. The following information in the
+ *   data array may be used on line item creation:
+ *   - $data['context']['display_path']: if present will be used to set the line
+ *     item's display_path field value.
+ * @param $type
+ *   The type of product line item to create. Must be a product line item as
+ *   defined in the line item type info array, and the line item type must
+ *   include the expected product related fields. Defaults to the base product
+ *   line item type defined by the Product Reference module.
+ *
+ * @return
+ *   The fully loaded line item populated with the product data as specified.
+ */
+function webform_commerce_line_item_new($unit_price, $order_id = 0, $data = array(), $details = array()) {
+  $type = 'webform_commerce';
+
   // Create the new line item.
-  $line_item = commerce_line_item_new('fee', $order_id);
+  $line_item = entity_create('commerce_line_item', array(
+    'type' => $type,
+    'order_id' => $order_id,
+    'data' => $data,
+  ));
 
-  // Set the price component of the unit price.
-  $line_item_wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
+  // Populate it with the product information.
+  webform_commerce_line_item_populate($line_item, $unit_price, $details);
   
-  // Other code to populate the $line_item...
-  $line_item_wrapper->line_item_label = 'Gift Wrapping';
-  $line_item_wrapper->quantity = 1;
-
-  // Build the custom unit price array.
-  $unit_price = array(
-    'amount' => (float) '13000',
-    'currency_code' => commerce_default_currency(),
-    'data' => array(),
-  );
-  
-  $line_item_wrapper->commerce_unit_price->data = commerce_price_component_add(
-    $unit_price,
-    'base_price',
-    $unit_price,
-    TRUE
-  );
-
-  // Save the incoming line item now so we get its ID.
-  commerce_line_item_save($line_item);
-  
+  // Return the line item.
   return $line_item;
+}
+
+/**
+ * Populates an existing product line item with the product and quantity data.
+ *
+ * @param $line_item
+ *   The fully loaded line item object, populated by reference.
+ * @param $product
+ *   The fully loaded product referenced by the line item.
+ */
+function webform_commerce_line_item_populate($line_item, $unit_price, $details = array()) {
+  // Set the label to be the product SKU.
+  $line_item->line_item_label = $details['name'];
+  $line_item->line_item_title = $details['name'];
+  
+  // $line_item->data['webform_component'] = $details;
+
+  // Wrap the line item and product to easily set field information.
+  $line_item_wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
+
+  $line_item->commerce_unit_price['und'][] = $unit_price;
+
+  if (!is_null($line_item_wrapper->commerce_unit_price->value())) {
+    // Add the base price to the components array.
+    if (!commerce_price_component_load($line_item_wrapper->commerce_unit_price->value(), 'webform_fee')) {
+      $line_item_wrapper->commerce_unit_price->data = commerce_price_component_add(
+        $line_item_wrapper->commerce_unit_price->value(),
+        'webform_fee',
+        $line_item_wrapper->commerce_unit_price->value(),
+        FALSE,
+        FALSE
+      );
+    }
+  }
 }
 
 /**
