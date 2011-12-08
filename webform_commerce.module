@@ -29,11 +29,9 @@ function webform_commerce_webform_component_info() {
 }
 
 /**
- * The following items are taken directly from webform_pay
- */
-
-/**
  * Implements hook_webform_component_info_alter().
+ * 
+ * Taken directly from webform_pay
  *
  */
 function webform_commerce_webform_component_info_alter(&$components) {
@@ -66,6 +64,8 @@ function webform_commerce_webform_component_presave(&$component) {
 
 /**
  * Implements hook_node_load().
+ * 
+ * Taken directly from webform_pay
  */
 function webform_commerce_node_load($nodes, $types) {
   // Quick check to see if we need to do anything at all for these nodes.
@@ -90,129 +90,108 @@ function webform_commerce_node_load($nodes, $types) {
 
 /**
  * Implements hook_form_alter().
+ * 
+ * Inspired by from webform_pay
  */
 function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
   if (preg_match('/^webform_client_form_\d+$/', $form_id) && isset($form['#node']->webform_commerce_cid)) {
-    global $user;
-    
+
     $node = $form['#node'];
-    
+
     $commerce_cid = $node->webform_commerce_cid;
     $component = $node->webform['components'][$commerce_cid];
 
-    $base = $component['extra']['pricing']['base_price'];
+    if ($product = commerce_product_load_by_sku($component['extra']['pricing']['product_to_add'])) {
+      $amount = commerce_product_calculate_sell_price($product);
+      $form_state['base_price'] = $amount;
+    }
 
-    $total = !isset($form_state['total']) ? $base : $form_state['total'];
+    $total = !isset($form_state['total']) ? $amount['amount'] : $form_state['total'];
     
-    // Add a class so we can add positioning to the form
+    // Add a class to add positioning to the form
     $form['#attributes']['class'][] = 'commerce-webform';
-    
-    foreach ($component['extra']['pricing']['price_components'] as $cid => $enabled) {
-      if ($enabled && isset($node->webform['components'][$cid])) {
-        $price_component = $node->webform['components'][$cid];
 
-        $parent_keys = webform_component_parent_keys($node, $price_component);
-        $element = $form['submitted'];
-        
-        foreach ($parent_keys as $form_key) {
+    // Create the "Total:" and Line Item box
+    if (empty($form['#submission']->sid)) {
+      $form['cost'] = array(
+        '#type' => 'container',
+      );
 
-          if (isset($element[$form_key])) {
-            $form['submitted'][$form_key]['#attributes']['class'][] = 'ajax-fix';
-            
+      $form['cost']['title'] = array(
+        '#type' => 'item',
+        '#markup' => "<h2>Total: <span id='cost_heading'>" . commerce_currency_format($total, $amount['currency_code']) . "</span></h2>",
+      );
+      
+      foreach ($component['extra']['pricing']['price_components'] as $cid => $enabled) {
+        if ($enabled && isset($node->webform['components'][$cid])) {
+
+          $price_component = $node->webform['components'][$cid];
+          $parent_keys = webform_component_parent_keys($node, $price_component);
+          
+          foreach ($parent_keys as $form_key) {
+            $title = $price_component['name'];
+            $value = isset($form_state['cost']['options'][$form_key]) ? $form_state['cost']['options'][$form_key] : '0';
+
+            $form['cost'][$form_key] = array(
+              '#type' => 'item',
+              '#markup' => "<p>" . $title . ": <span id='{$form_key}'>" . commerce_currency_format($value, 'USD') . "</span></p>",
+            );
+
             // add ajax to each component that can alter price
+            $form['submitted'][$form_key]['#attributes']['class'][] = 'ajax-fix';
             $form['submitted'][$form_key]['#ajax'] = array(
               'callback' => 'webform_commerce_price_adjust', 
-              'wrapper' => 'cost',
               'progress' => array(
                 'type' => 'throbber',
                 'message' => NULL,
               ),
             );
           }
-          else {
-            $element = FALSE;
-            break;
-          }
         }
       }
     }
-
-    $form['price'] = array(
-      '#type' => 'item',
-      '#title' => t('Total'),
-      '#prefix' => "<div id='cost'>",
-      '#suffix' => '</div>',
-      '#markup' => "$". $total,
-    );
-
-    // Check if the commerce component is on this page of the webform.
-    // @TODO - Is this necessary since our component is really only used on submit?
-    $parent_keys = webform_component_parent_keys($node, $component);
-    $element = $form['submitted'];
-    foreach ($parent_keys as $form_key) {
-      if (isset($element[$form_key])) {
-        $element = $element[$form_key];
-      }
-      else {
-        break;
-      }
-    }
-
-    // Initialize the form for the selected payment method.
-    if ($element /* && $pay_form = pay_form_load($component['extra']['pfid']) */) {
-      // $form['#pre_render'][] = 'webform_pay_prerender';
-      $form['#validate'][] = 'webform_commerce_validate';
-      // $pay_form->form($form, $form_state, 'webform');
-      $form['#after_build'][] = 'webform_commerce_after_build';
-
-      // add a custom submit function to add the product to the cart
-      $form['#submit'][] = 'webform_commerce_submit';
-      
-      // Store the customer uid in the form so other modules can override with a
-      // selection widget if necessary.
-      $form['uid'] = array(
-        '#type' => 'value',
-        '#value' => $user->uid,
-      );
-      
-    }
+    
+    $form['#after_build'][] = 'webform_commerce_after_build';
+    $form['#validate'][] = 'webform_commerce_validate';
+    $form['#submit'][] = 'webform_commerce_submit';
   }
 }
 
 /**
  * Ajax callback to adjust the price display
  */
+function webform_commerce_price_adjust(&$form, $form_state) {
+  $commands = array();
+  
+  // Adjust the display of the main "Total"
+  $amount = commerce_currency_format($form_state['total'], $form_state['base_price']['currency_code']);
+  $commands[] = ajax_command_html("#cost_heading", $amount);
 
-function webform_commerce_price_adjust($form, $form_state) {
-  $element = array(
-    '#type' => 'item_list',
-    '#items' => array(
-      '0' => 'Test',
-      '2' => 'Test 2',
-    ),
-  );
-  return $form['price'];
-  // return render($element);
+  // Adjust the display value of each line item
+  $items = $form_state['cost']['options'];
+  foreach($items as $k => $v) {
+    $line_item_amount = commerce_currency_format($v, 'USD');
+    $commands[] = ajax_command_html("#". $k, $line_item_amount);
+  }
+
+  return array('#type' => 'ajax', '#commands' => $commands);
 }
 
-
 /**
- * After build function for webform commerce fields.
+ * After build function for webform_commerce_form_alter.
  *
- * Remove the extra fields that are not collected by Pay module directly.
+ * Inspired by from webform_pay
  */
 function webform_commerce_after_build($form) {
   $node = $form['#node'];
   $commerce_cid = $node->webform_commerce_cid;
   $component = $node->webform['components'][$commerce_cid];
 
-  // If editing a submission, do NOT reprocess payment information. This
-  // information becomes display-only.
-  
-  // @TODO - Change this
+  // If editing a submission, do NOT reprocess add to cart/validate functions.
   if (!empty($form['#submission']->sid)) {
-    $submit_index = array_search('pay_submit', $form['#submit']);
-    $validate_index = array_search('pay_validate', $form['#validate']);
+    $submit_index = array_search('webform_commerce_submit', $form['#submit']);
+    $validate_index = array_search('webform_commerce_validate', $form['#validate']);
+    
     if ($submit_index !== FALSE) {
       unset($form['#submit'][$submit_index]);
     }
@@ -230,6 +209,8 @@ function webform_commerce_after_build($form) {
  * This is responsible for finding all the price fields within the webform and
  * adding up all the totals. Currently either textfields or select lists may
  * be used for prices.
+ * 
+ * Inspired by from webform_pay
  */
 function webform_commerce_validate(&$form, &$form_state) {
   $node = $form['#node'];
@@ -237,11 +218,12 @@ function webform_commerce_validate(&$form, &$form_state) {
   $component = $node->webform['components'][$commerce_cid];
 
   // Add up all the components that contain price values.
-  $total = $component['extra']['pricing']['base_price'];
+  $total = $form_state['base_price']['amount'];
   
   foreach ($component['extra']['pricing']['price_components'] as $cid => $enabled) {
     if ($enabled && isset($node->webform['components'][$cid])) {
       $price_component = $node->webform['components'][$cid];
+      
       // Find the price value if on the current page.
       $price_value = _webform_commerce_component_value($node, $price_component, $form_state['values']['submitted'], TRUE);
       
@@ -250,21 +232,22 @@ function webform_commerce_validate(&$form, &$form_state) {
         $price_value = _webform_commerce_component_value($node, $price_component, $form_state['storage']['submitted']);
       }
       
+      $form_key = $price_component['form_key'];
+      $form_state['cost']['options'][$form_key] = (float) $price_value * 100;
+      
       $price_parents = webform_component_parent_keys($node, $price_component);
       if (!empty($price_value) && !is_numeric($price_value)) {
         form_set_error('submitted][' . implode('][', $price_parents), t('The value for @name needs to be a valid amount.', array('@name' => $price_component['name'])));
       }
       else {
-        $total += (float) $price_value;
+        $total += (float) $price_value * 100;
       }
     }
   }
+  
   $form_state['total'] = $total;
   
-  // Set the total for the payment. This total is the grand total of all payment
-  // systems together. The pay_form class may validate this total.
-  
-  // @TODO this needs to be changed to commerce
+  // Set the total for the webform.
   $form_state['values']['webform_commerce']['total'] = $total;
   $form_state['values']['webform_commerce']['status'] = 'unpaid';
   
@@ -281,87 +264,71 @@ function webform_commerce_validate(&$form, &$form_state) {
   }
 }
 
-
 /**
  * Submit callback to add a product to the cart
  * This is taken straight from commerce_cart_add_to_cart_form_submit
  */
 
 function webform_commerce_submit(&$form, &$form_state) {
-  // $product_id = $form_state['values']['product_id'];
-  $product_id = '4';
-  $product = commerce_product_load($product_id);
-  dsm($product);
+  // Only submit the registration if the webform has been fully submitted
+  if (!empty($form_state['values']['details']['sid'])) {
+    global $user;
+    // $product_id = $form_state['values']['product_id'];
+    $product_id = '1';
+    $quantity = '1';
+    $combine = FALSE;
+    
+    if ($line_item = commerce_cart_product_add_by_id($product_id, $quantity, $combine, $user->uid)) {
 
-  // Create the new product line item of the same type.
-  // $line_item = commerce_product_line_item_new($product, $form_state['values']['quantity'], 0, $form_state['line_item']->data, $form_state['line_item']->type);
+      $new_line_item = my_special_function2($line_item->order_id);
+      
+      // Add the line item to the order using the wrapper.
+      // Wrap the order to simplify manipulating its field data.
+      $order = commerce_order_load($line_item->order_id);
+      $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
 
-  $line_item = commerce_product_line_item_new($product, 1, 0, NULL, 'example_line_item_1');
-  dsm($line_item);
-  
-  module_load_include('inc', 'commerce_line_item', 'commerce_line_item.rules');
-  commerce_line_item_unit_price_add($line_item, '450000', 'price_example_component', COMMERCE_ROUND_HALF_UP);
+      $order_wrapper->commerce_line_items[] = $new_line_item;
 
-  // Save the line item to get its ID.
-  // commerce_line_item_save($line_item);
-
-  // Allow modules to prepare this as necessary. This hook is defined by the
-  // Product Pricing module.
-  drupal_alter('commerce_product_calculate_sell_price_line_item', $line_item);
-  
-  // Remove line item field values the user didn't have access to modify.
-  // foreach ($form_state['values']['line_item_fields'] as $field_name => $value) {
-  //   // Note that we're checking the Commerce Cart settings that we inserted
-  //   // into this form element array back when we built the form. This means a
-  //   // module wanting to alter a line item field widget to be available must
-  //   // update both its form element's #access value and the field_access value
-  //   // of the #commerce_cart_settings array.
-  //   if (empty($form['line_item_fields'][$field_name]['#commerce_cart_settings']['field_access'])) {
-  //     unset($form_state['values']['line_item_fields'][$field_name]);
-  //   }
-  // }
-  
-  // Unset the line item field values array if it is now empty.
-  // if (empty($form_state['values']['line_item_fields'])) {
-  //   unset($form_state['values']['line_item_fields']);
-  // }
-  
-  // Add field data to the line item.
-  // field_attach_submit('commerce_line_item', $line_item, $form['line_item_fields'], $form_state);
-  
-  // Process the unit price through Rules so it reflects the user's actual
-  // purchase price.
-  rules_invoke_event('commerce_product_calculate_sell_price', $line_item);
-  
-  // Only attempt an Add to Cart if the line item has a valid unit price.
-  $line_item_wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
-  
-  if (!is_null($line_item_wrapper->commerce_unit_price->value())) {
-    // Add the product to the specified shopping cart.
-    $form_state['line_item'] = commerce_cart_product_add(
-      $form_state['values']['uid'],
-      $line_item,
-      FALSE
-    );
+      // Save the order again to update its line item reference field.
+      commerce_order_save($order);
+      
+      drupal_set_message(t('Congrats'), 'status');
+    }
+    else {
+      drupal_set_message(t('%title could not be added to your cart.', array('%title' => $product->title)), 'error');
+    }
   }
-  else {
-    drupal_set_message(t('%title could not be added to your cart.', array('%title' => $product->title)), 'error');
-  }
-  
-  dsm($form_state);
 }
 
-/**
- * Implements hook_commerce_product_calculate_sell_price_line_item_alter().
- */
-function webform_commerce_commerce_product_calculate_sell_price_line_item_alter($line_item) {
-  global $user;
-  dsm($user);
+function my_special_function2($order_id) {
+  // Create the new line item.
+  $line_item = commerce_line_item_new('fee', $order_id);
 
-  // Reference the current shopping cart order in the line item if it isn't set.
-  if (empty($line_item->order_id)) {
-    $line_item->order_id = commerce_cart_order_id($user->uid);
-  }
+  // Set the price component of the unit price.
+  $line_item_wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
+  
+  // Other code to populate the $line_item...
+  $line_item_wrapper->line_item_label = 'Gift Wrapping';
+  $line_item_wrapper->quantity = 1;
+
+  // Build the custom unit price array.
+  $unit_price = array(
+    'amount' => (float) '13000',
+    'currency_code' => commerce_default_currency(),
+    'data' => array(),
+  );
+  
+  $line_item_wrapper->commerce_unit_price->data = commerce_price_component_add(
+    $unit_price,
+    'base_price',
+    $unit_price,
+    TRUE
+  );
+
+  // Save the incoming line item now so we get its ID.
+  commerce_line_item_save($line_item);
+  
+  return $line_item;
 }
 
 /**

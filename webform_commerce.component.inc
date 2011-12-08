@@ -17,7 +17,7 @@ function _webform_defaults_commerce() {
     'value' => '',
     'extra' => array(
       'pricing' => array(
-        'base_price' => '',
+        'product_to_add',
         'price_components' => array(),
         'status' => 'unpaid',
       ),
@@ -46,17 +46,26 @@ function _webform_edit_commerce($component) {
     '#collapsible' => TRUE,
     '#collapsed' => FALSE,
   );
-  
-  $form['extra']['pricing']['base_price'] = array(
+
+  $form['extra']['pricing']['product_to_add'] = array(
     '#type' => 'textfield',
-    '#title' => t('Base price'),
-    '#description' => t('Enter the base price.'),
-    '#default_value' => $component['extra']['pricing']['base_price'],
-    '#size' => 10,
-    '#maxlength' => 255,
-    '#element_validate' => array('element_validate_integer'),
-    '#required' => TRUE,
+    '#title' => t('Product to place in the order'),
+    '#default_value' => $component['extra']['pricing']['product_to_add'],
+    // Here we're using Commerce Product's autocomplete path in an unusual way
+    // just to get a product for the form.
+    '#autocomplete_path' => 'commerce_product/autocomplete/any/any/any',
   );
+  
+  // $form['extra']['pricing']['base_price'] = array(
+  //   '#type' => 'textfield',
+  //   '#title' => t('Base price'),
+  //   '#description' => t('Enter the base price.'),
+  //   '#default_value' => $component['extra']['pricing']['base_price'],
+  //   '#size' => 10,
+  //   '#maxlength' => 255,
+  //   '#element_validate' => array('element_validate_integer'),
+  //   '#required' => TRUE,
+  // );
   
   $price_components = webform_component_list($node, 'price', FALSE, FALSE);
   
@@ -74,9 +83,27 @@ function _webform_edit_commerce($component) {
     '#all_checkbox' => FALSE,
     // '#required' => TRUE,
   );
-
+  
   return $form;
 }
+
+/**
+ * Validation handler for order creation.
+ *
+ * Convert the SKUs we gathered into product IDs and the usernames into ids.
+ *
+ * The form value conversion shown here is not part of the core example. It's
+ * just a way to make the form do what we want to demonstrate order creation.
+ */
+function _webform_edit_commerce_validate($form, &$form_state) {
+  $value = array();
+  dsm($form_state);
+  // If a value was entered into the autocomplete...
+  if (!empty($form_state['values']['extra']['product_to_add'])) {
+    order_example_validate_sku($form['order_creation']['product_to_add'], $form_state['values']['product_to_add'], $form_state);
+  }
+}
+
 
 /**
  * Render a Webform component to be part of a form.
