@@ -28,6 +28,6 @@ form.commerce-webform #edit-cost .form-item p {
   margin-bottom: 0;
 }
 
-form.commerce-webform .form-item {
-  overflow: hidden;
+.ajax-progress {
+  float:none;
 }

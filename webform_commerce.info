@@ -23,7 +23,7 @@ dependencies[] = webform
 
 ; Stylesheets
 stylesheets[all][] = webform-commerce.css
-; scripts[] = webform_commerce.js
+scripts[] = webform_commerce.js
 
 ; Configuration page
 ; configure = admin/config/webform_commerce

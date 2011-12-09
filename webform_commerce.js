@@ -2,7 +2,7 @@
 
   Drupal.behaviors.webformCommerce = {
     attach: function (context, settings) {
-      $('.ajax-fix', context).parent().css("overflow", "hidden");
+      $('.ajax-processed', context).parent().css("overflow", "hidden");
     }
   };
 

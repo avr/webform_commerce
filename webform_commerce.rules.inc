@@ -8,28 +8,28 @@
  * @{
  */
 
- /**
-  * Implements hook_rules_action_info().
-  */
- function webform_commerce_rules_action_info() {
-   $actions = array();
+/**
+* Implements hook_rules_action_info().
+*/
+function webform_commerce_rules_action_info() {
+  $actions = array();
 
-   $actions['webform_commerce_update_status'] = array(
-     'label' => t('Update the status of a webform submission(s).'),
-     'parameter' => array(
-       'commerce_order' => array(
+  $actions['webform_commerce_update_status'] = array(
+    'label' => t('Update the status of a webform submission(s).'),
+    'parameter' => array(
+      'commerce_order' => array(
          'type' => 'commerce_order',
          'label' => t('Order to update'),
-       ),
-     ),
-     'group' => t('Webform Commerce'),
-     'callbacks' => array(
-       'execute' => 'webform_commerce_update_status',
-     ),
-   );
+      ),
+    ),
+    'group' => t('Webform Commerce'),
+      'callbacks' => array(
+        'execute' => 'webform_commerce_update_status',
+      ),
+  );
 
-   return $actions;
- }
+  return $actions;
+}
 
 /**
 * Rules action: updates an order's webform submissions as paid

@@ -50,7 +50,6 @@ function webform_commerce_line_item_title($line_item) {
   return $line_item->line_item_label;
 }
 
-
 /**
  * Implements hook_webform_component_info
  */
