@@ -11,11 +11,11 @@
 /**
  * Implements hook_commerce_price_component_type_info().
  */
-function webform_commerce_commerce_price_commerce_price_component_type_info() {
+function webform_commerce_commerce_price_component_type_info() {
   return array(
     'webform_fee' => array(
       'title' => t('Webform fee'),
-      'display_title' => t('Event option'),
+      'display_title' => t('Options'),
       'weight' => -50,
     ),
   );
@@ -339,16 +339,19 @@ function webform_commerce_submit(&$form, &$form_state) {
       if (isset($form_state['cost']['options'])) {
         foreach ($form_state['cost']['options'] as $k) {
           if ($k['amount'] > 0) {
-            $unit_price = array(
-              'amount' => $k['amount'],
-              'currency_code' => 'USD',
-              'data' => array(),
-            );
-            $new_line_item = webform_commerce_line_item_new($unit_price, $line_item->order_id, NULL, $k['details']);
+            $line_item->data['webform_price_components'][] = $k;
+            commerce_line_item_save($line_item);
 
-            commerce_line_item_save($new_line_item);
-            // Add the line item to the order using the wrapper.
-            $order_wrapper->commerce_line_items[] = $new_line_item;
+            /// $unit_price = array(
+            ///   'amount' => $k['amount'],
+            ///   'currency_code' => 'USD',
+            ///   'data' => array(),
+            /// );
+            /// $new_line_item = webform_commerce_line_item_new($unit_price, $line_item->order_id, NULL, $k['details']);
+            /// 
+            /// commerce_line_item_save($new_line_item);
+            /// // Add the line item to the order using the wrapper.
+            /// $order_wrapper->commerce_line_items[] = $new_line_item;
           }
         }
 
