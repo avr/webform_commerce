@@ -17,7 +17,7 @@ function _webform_defaults_commerce() {
     'value' => '',
     'extra' => array(
       'pricing' => array(
-        'product_to_add',
+        'product_to_add' => '',
         'price_components' => array(),
         'status' => 'unpaid',
       ),
@@ -54,6 +54,7 @@ function _webform_edit_commerce($component) {
     // Here we're using Commerce Product's autocomplete path in an unusual way
     // just to get a product for the form.
     '#autocomplete_path' => 'commerce_product/autocomplete/any/any/any',
+    '#required' => TRUE,
   );
   
   // $form['extra']['pricing']['base_price'] = array(
