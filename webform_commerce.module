@@ -335,16 +335,16 @@ function webform_commerce_submit(&$form, &$form_state) {
             $line_item->data['webform_price_components'][] = $option;
             commerce_line_item_save($line_item);
 
-            /// $unit_price = array(
-            ///   'amount' => $option['amount'],
-            ///   'currency_code' => 'USD',
-            ///   'data' => array(),
-            /// );
-            /// $new_line_item = webform_commerce_line_item_new($unit_price, $line_item->order_id, NULL, $option['details']);
-            /// 
-            /// commerce_line_item_save($new_line_item);
-            /// // Add the line item to the order using the wrapper.
-            /// $order_wrapper->commerce_line_items[] = $new_line_item;
+            $unit_price = array(
+              'amount' => $option['amount'],
+              'currency_code' => 'USD',
+              'data' => array(),
+            );
+            $new_line_item = webform_commerce_line_item_new($unit_price, $line_item->order_id, NULL, $option['details']);
+            
+            commerce_line_item_save($new_line_item);
+            // Add the line item to the order using the wrapper.
+            $order_wrapper->commerce_line_items[] = $new_line_item;
           }
         }
 
