@@ -1,7 +1,7 @@
 A Drupal 7 Webform Component which does the following:
 
 1. Creates a commerce line item type: "Webform extra fee"
-   * A "fee" is also created.  This is currently not used.
+   * A "component" is also created.  This is currently not used.
 2. Creates a webform component: "Commerce payment"
 
 Then has a rule which do the following:
@@ -9,6 +9,11 @@ Then has a rule which do the following:
 1. After checkout is completed it:
    * Retrieves the webform submission id (sid) from the submitted webform
    * Changes the status of the webform from "unpaid" to "paid"
+
+##FEATURES
+* Simple setup for event registrations
+* Ajax price calculation for users creating the form
+* http://skitch.com/avanruler/gxn5s/webform-commerce
 
 ##SETUP
 1. Enable the module
