@@ -409,7 +409,7 @@ function webform_commerce_line_item_populate($line_item, $unit_price, $details =
     if (!commerce_price_component_load($line_item_wrapper->commerce_unit_price->value(), 'webform_fee')) {
       $line_item_wrapper->commerce_unit_price->data = commerce_price_component_add(
         $unit_price,
-        'webform_fee',
+        'base_price',
         $unit_price,
         FALSE,
         FALSE
