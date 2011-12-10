@@ -13,7 +13,7 @@ Then has a rule which do the following:
 ##FEATURES
 * Simple setup for event registrations
 * Ajax price calculation for users creating the form
-* http://skitch.com/avanruler/gxn5s/webform-commerce
+* http://img.skitch.com/20111209-e8am6gm3rma3rpkwsq9ykxyeqg.png
 
 ##SETUP
 1. Enable the module
