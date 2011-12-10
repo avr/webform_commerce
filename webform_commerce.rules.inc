@@ -109,7 +109,10 @@ function webform_commerce_calculate_price($line_item, $component_name) {
   foreach($line_item->data['webform_price_components'] as $item) {
     $amount = $item['amount'];
     $round_mode = COMMERCE_ROUND_HALF_UP;
+    
     if (is_numeric($amount)) {
+
+      // taken from commerce_line_item.rules.inc
       $wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
       $unit_price = commerce_price_wrapper_value($wrapper, 'commerce_unit_price', TRUE);
 
@@ -134,6 +137,7 @@ function webform_commerce_calculate_price($line_item, $component_name) {
         FALSE
       );
     }
+  
   }
 }
 

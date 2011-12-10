@@ -12,14 +12,21 @@ form.commerce-webform #edit-cost {
   background: #ececec;
   width: 200px;
 }
-
-form.commerce-webform #edit-cost h2 {
+form.commerce-webform #edit-title {
   border-bottom: 1px solid #cccccc;
   margin: 8px 0 4px;
   padding: 0 0 4px;
+  overflow: hidden;
+}
+form.commerce-webform #edit-title label {
+  float: left;
 }
 form.commerce-webform #edit-cost span {
-  float:right;
+  float: right;
+}
+form.commerce-webform #edit-title label,
+form.commerce-webform #edit-title span {
+  font-size: 18px;
 }
 form.commerce-webform #edit-cost .form-item {
   margin-bottom: 10px;
