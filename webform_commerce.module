@@ -216,10 +216,6 @@ function webform_commerce_price_adjust(&$form, $form_state) {
  * Inspired by from webform_pay
  */
 function webform_commerce_after_build($form) {
-  // $node = $form['#node'];
-  // $commerce_cid = $node->webform_commerce_cid;
-  // $component = $node->webform['components'][$commerce_cid];
-
   // If editing a submission, do NOT reprocess add to cart/validate functions.
   if (!empty($form['#submission']->sid)) {
     $submit_index = array_search('webform_commerce_submit', $form['#submit']);
