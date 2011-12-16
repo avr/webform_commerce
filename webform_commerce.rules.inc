@@ -8,40 +8,6 @@
  * @{
  */
 
-
-/**
-* Implements hook_rules_condition_info().
-*/
-function webform_commerce_rules_condition_info() {
-  $conditions = array();
-  
-  $conditions['webform_contains_pricing_components'] = array(
-    'label' => t('Webform contains additional pricing components'),
-    'parameter' => array(
-      'commerce_line_item' => array(
-        'type' => 'commerce_line_item',
-        'label' => t('Line item'),
-       ),
-    ),
-    'group' => t('Webform Commerce'),
-    'callbacks' => array(
-      'execute' => 'webform_contains_pricing_components',
-    ),
-  );
-  
-  return $conditions;
-}
-
-/**
- * Rules condition: checks to see if line item has webform pricing components.
- */
-function webform_contains_pricing_components($line_item) {
-  if (isset($line_item->data['webform_price_components'])) {
-    return TRUE;
-  };
-}
-
-
 /**
 * Implements hook_rules_action_info().
 */

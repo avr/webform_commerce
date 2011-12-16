@@ -1,32 +1,12 @@
 <?php
 /**
  * @file
- * This is the file description for Webform Commerce module.
+ * Webform component to integrate Webform + Commerce.
  *
- * In this more verbose, multi-line description, you can specify what this
- * file does exactly. Make sure to wrap your documentation in column 78 so
- * that the file can be displayed nicely in default-sized consoles.
  */
- 
-/**
- * Implements hook_commerce_price_component_type_info().
- */
-function webform_commerce_commerce_price_component_type_info() {
-  return array(
-    'webform_fee' => array(
-      'title' => t('Webform fee'),
-      'display_title' => t('Options'),
-      'weight' => -50,
-    ),
-  );
-}
 
 /**
  * Implements hook_commerce_line_item_type_info().
- *
- * - webform_line_item is completely implemented and is not a product line
- *   item type but rather a "surcharge", and the hook_commerce_order_presave()
- *   is provided to make sure that there is one for every order.
  *
  * @see hook_commerce_line_item_type_info().
  * @see http://www.drupalcommerce.org/specification/info-hooks/checkout
