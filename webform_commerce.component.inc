@@ -17,10 +17,12 @@ function _webform_defaults_commerce() {
     'value' => '',
     'extra' => array(
       'pricing' => array(
+        'type' => 'ref',
         'product_to_add' => '',
-        'price_components' => array(),
-        'status' => 'unpaid',
+        'amount' => '',
       ),
+      'price_components' => array(),
+      'status' => 'unpaid',
     ),
   );
 }
@@ -29,7 +31,7 @@ function _webform_defaults_commerce() {
  * Implements _webform_edit_component().
  */
 function _webform_edit_commerce($component) {
-
+  
   $form = array();
 
   $form['extra']['description'] = array(
@@ -46,27 +48,103 @@ function _webform_edit_commerce($component) {
     '#collapsible' => TRUE,
     '#collapsed' => FALSE,
   );
+  
+  $form['extra']['pricing']['type'] = array(
+    '#type' => 'select',
+    '#options' => array('ref' => 'Reference an existing product', 'new' => 'Create a new product'),
+    '#default_value' => $component['extra']['pricing']['type'],
+  );
 
+  $ref_product = array(
+    'visible' => array(
+      '#edit-extra-pricing-type' => array('value' => 'ref'),
+    ),
+  );
+  
+  $add_product = array(
+    'visible' => array(
+      '#edit-extra-pricing-type' => array('value' => 'new'),
+    ),
+    'required' => array(
+      '#edit-extra-pricing-type' => array('value' => 'new'),
+    ),
+  );
+
+  if ($product = commerce_product_load_by_sku($component['extra']['pricing']['product_to_add'])) {
+    $amount = commerce_product_calculate_sell_price($product);
+    $currency_code = $amount['currency_code'];
+  }
+
+  $display_amount = isset($amount) ? $amount : '0';
+  
   $form['extra']['pricing']['product_to_add'] = array(
     '#type' => 'textfield',
     '#title' => t('Product to place in the order'),
+    '#description' => t('This product will be added to the cart when the user clicks the "Submit" button on the form.'),
     '#default_value' => $component['extra']['pricing']['product_to_add'],
     // Here we're using Commerce Product's autocomplete path in an unusual way
     // just to get a product for the form.
     '#autocomplete_path' => 'commerce_product/autocomplete/any/any/any',
     '#required' => TRUE,
+    '#ajax' => array(
+      'callback' => '_webform_edit_commerce_update_pricing',
+      'wrapper' => 'amount',
+    ),
+    '#states' => $ref_product,
+  );
+  
+  $form['extra']['pricing']['amount'] = array(
+    '#type' => 'item',
+    '#title' => t('Current base price'),
+    '#prefix' => '<div id="amount">',
+    '#suffix' => '</div>',
+    '#markup' => '<span class="cost">' . commerce_currency_format($display_amount, 'USD') . '</span>',
+    '#states' => $ref_product,
+  );
+  
+  
+  $types = commerce_product_types();
+  
+  $form['extra']['pricing']['product_type'] = array(
+    '#type' => 'select',
+    '#title' => t('Type of product to be created'),
+    '#description' => t('New product types can be created !link.', array('!link' => l('here', 'admin/commerce/products/types'))),
+    '#options' => drupal_map_assoc(array_keys($types)),
+    '#states' => $add_product,
+  );
+  
+  $form['extra']['pricing']['product_title'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Product title'),
+    '#default_value' => t('Webform product'),
+    '#states' => $add_product,
+  );
+  $form['extra']['pricing']['product_sku'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Product sku'),
+    '#default_value' => '',
+    '#description' => t('Unique id for this product'),
+    '#states' => $add_product,
+  );
+  
+  $form['extra']['pricing']['product_price'] = array(
+    '#title' => t('Product price'),
+    '#type' => 'textfield',
+    '#description' => t('A price in decimal format, without a currency symbol'),
+    '#default_value' => '100.00',
+    '#states' => $add_product,
   );
   
   $price_components = webform_component_list($node, 'price', FALSE, FALSE);
   
-  $form['extra']['pricing']['price_components'] = array(
+  $form['extra']['price_components'] = array(
     '#type' => 'select',
     '#title' => t('Price components'),
     '#options' => $price_components,
-    '#default_value' => $component['extra']['pricing']['price_components'],
+    '#default_value' => $component['extra']['price_components'],
     '#multiple' => TRUE,
     '#size' => 10,
-    '#description' => t('Select the components that contain price values. These can be either "select" or "textfield" items. The total value of these components will be charged to the user.'),
+    '#description' => t('Select the components that contain price values. These can be either "select" or "textfield" items. Each of these components will be added as a line item in the user\'s cart.'),
     '#process' => array('webform_component_select'),
     '#collapsible' => FALSE,
     '#collapsed' => FALSE,
@@ -76,13 +154,28 @@ function _webform_edit_commerce($component) {
   return $form;
 }
 
-/**
- * Validation handler for commerce component.
- */
-function _webform_edit_commerce_validate($form, &$form_state) {
-  $value = array();
+function _webform_edit_commerce_update_pricing(&$form, $form_state) {
+  $commands = array();
+  
+  // Adjust the display of the main "Total"
+  $product = commerce_product_load_by_sku($form_state['input']['extra']['pricing']['product_to_add']);
+  $wrapper = entity_metadata_wrapper('commerce_product', $product);
+  $amount = $wrapper->commerce_price->amount->value();
+  $currency_code = 'USD';
+  
+  $commands[] = ajax_command_html("#amount .cost", commerce_currency_format($amount, $currency_code));
+  
+  return array('#type' => 'ajax', '#commands' => $commands);
 }
 
+function webform_commerce_form_webform_component_edit_form_alter(&$form, &$form_state, $form_id) {
+  // This is required in order to return the cost of the refrenced product by ajax.
+  form_load_include($form_state, 'inc', 'webform', 'includes/webform.components');
+  
+  // Extra submit handler in order to create product if necessary
+  // $form['#submit'][] = '_webform_edit_commerce_submit';
+  // $form['extra']['pricing']['product_to_add']['#default_value'] = $form_state['values']['extra']['pricing']['product_to_add'];
+}
 
 /**
  * Render a Webform component to be part of a form.

@@ -63,6 +63,18 @@ function webform_commerce_webform_component_info_alter(&$components) {
   $components['hidden']['features']['price'] = TRUE;
 }
 
+
+/**
+ * Implements hook_webform_component_presave().
+ */
+function webform_commerce_webform_component_presave(&$component) {
+  // Create a new product if necessary
+  if ($component['type'] == 'commerce') {
+    // Update the component with the new product_sku
+    // $component['extra']['pricing']['product_to_add'] = 'special_test';
+  }
+}
+
 /**
  * Implements hook_node_load().
  * 
@@ -130,7 +142,7 @@ function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
       
       // add ajax for each price component
       
-      foreach ($commerce_comp['extra']['pricing']['price_components'] as $cid => $enabled) {
+      foreach ($commerce_comp['extra']['price_components'] as $cid => $enabled) {
         if ($enabled && isset($node->webform['components'][$cid])) {
 
           $price_component = $node->webform['components'][$cid];
@@ -138,8 +150,8 @@ function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
           
           foreach ($parent_keys as $form_key) {
             $title = $price_component['name'];
-            $options = isset($form_state['wfc']['options']) ? $form_state['wfc']['options'] : '';
-            $value = isset($options[$form_key]['amount']) ? $options[$form_key]['amount'] : '0';
+            $options = isset($form_state['wfc']['options']) ? $form_state['wfc']['options'] : NULL;
+            $value = isset($options[$form_key]['amount']) ? $options[$form_key]['amount'] : (int) 0;
 
             $form['cost'][$form_key] = array(
               '#type' => 'item',
@@ -229,7 +241,7 @@ function webform_commerce_validate(&$form, &$form_state) {
   // Add up all the components that contain price values.
   $total = $form_state['wfc']['base_price']['amount'];
   
-  foreach ($commerce_component['extra']['pricing']['price_components'] as $cid => $enabled) {
+  foreach ($commerce_component['extra']['price_components'] as $cid => $enabled) {
     if ($enabled && isset($node->webform['components'][$cid])) {
       $price_component = $node->webform['components'][$cid];
       
