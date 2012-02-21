@@ -55,6 +55,7 @@ function _webform_edit_commerce($component) {
     '#default_value' => $component['extra']['pricing']['type'],
   );
 
+  // Create reusable states
   $ref_product = array(
     'visible' => array(
       '#edit-extra-pricing-type' => array('value' => 'ref'),
@@ -75,7 +76,7 @@ function _webform_edit_commerce($component) {
     $currency_code = $amount['currency_code'];
   }
 
-  $display_amount = isset($amount) ? $amount : '0';
+  $display_amount = isset($amount) ? $amount['amount'] : 0;
   
   $form['extra']['pricing']['product_to_add'] = array(
     '#type' => 'textfield',
@@ -171,10 +172,6 @@ function _webform_edit_commerce_update_pricing(&$form, $form_state) {
 function webform_commerce_form_webform_component_edit_form_alter(&$form, &$form_state, $form_id) {
   // This is required in order to return the cost of the refrenced product by ajax.
   form_load_include($form_state, 'inc', 'webform', 'includes/webform.components');
-  
-  // Extra submit handler in order to create product if necessary
-  // $form['#submit'][] = '_webform_edit_commerce_submit';
-  // $form['extra']['pricing']['product_to_add']['#default_value'] = $form_state['values']['extra']['pricing']['product_to_add'];
 }
 
 /**
@@ -310,11 +307,11 @@ function _webform_analysis_commerce($component, $sids = array(), $single = FALSE
 
   $result = $query->execute();
   foreach ($result as $data) {
-    if ($data['data'] == 'unpaid') {
+    if ($data['data'] == 'paid') {
       $paid++;
-    }
-    if ($data['no'] == 'total') {
-      $total += $data['data'];
+      if ($data['no'] == 'total') {
+        $total += $data['data'];
+      }
     }
     $submissions++;
   }

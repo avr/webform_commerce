@@ -122,7 +122,7 @@ function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
     }
 
     $total = !isset($form_state['wfc']['total']) ? $amount['amount'] : $form_state['wfc']['total'];
-    
+
     // Add a class to add positioning to the form
     $form['#attributes']['class'][] = 'commerce-webform';
 
@@ -147,7 +147,7 @@ function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
 
           $price_component = $node->webform['components'][$cid];
           $parent_keys = webform_component_parent_keys($node, $price_component);
-          
+
           foreach ($parent_keys as $form_key) {
             $title = $price_component['name'];
             $options = isset($form_state['wfc']['options']) ? $form_state['wfc']['options'] : NULL;
@@ -183,7 +183,7 @@ function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
  */
 function webform_commerce_price_adjust(&$form, $form_state) {
   $commands = array();
-  
+
   // Adjust the display of the main "Total"
   $total = $form_state['wfc']['total'];
   $currency_code = $form_state['wfc']['base_price']['currency_code'];
@@ -193,7 +193,7 @@ function webform_commerce_price_adjust(&$form, $form_state) {
 
   // Adjust the display value of each line item
   $items = $form_state['wfc']['options'];
-  
+
   foreach($items as $k => $v) {
     $line_item_amount = commerce_currency_format($v['amount'], 'USD');
     $commands[] = ajax_command_html("#". $k, $line_item_amount);
@@ -266,20 +266,20 @@ function webform_commerce_validate(&$form, &$form_state) {
       }
     }
   }
-  
+
   $form_state['wfc']['total'] = $total;
-  
+
   // Set the total for the webform.
   $form_state['values']['webform_commerce']['total'] = $total;
   $form_state['values']['webform_commerce']['status'] = 'unpaid';
-  
+
   // Drill down to the commerce form element.
   $parent_keys = webform_component_parent_keys($node, $commerce_component);
   $element = &$form['submitted'];
   foreach ($parent_keys as $form_key) {
     $element = &$element[$form_key];
   }
-  
+
   if ($element) {
     // Set the component value so that it gets saved into the Webform table.
     form_set_value($element, $form_state['values']['webform_commerce'], $form_state);
@@ -295,24 +295,23 @@ function webform_commerce_submit(&$form, &$form_state) {
   // Only submit the registration if the webform has been fully submitted
   if (!empty($form_state['values']['details']['sid'])) {
     global $user;
-    
+
     if (isset($form_state['wfc']['product_id'])) {
       // $product_id = $form_state['values']['product_id'];
       $product_id = $form_state['wfc']['product_id'];
       $quantity = '1';
       $combine = FALSE;
     }
-    
+
     if ($line_item = commerce_cart_product_add_by_id($product_id, $quantity, $combine, $user->uid)) {
       $order = commerce_order_load($line_item->order_id);
 
-      // Add webform details to the order. This allows for marking the webform "paid"
-      // through rules
+      // Add webform details to the order. This allows for marking the webform "paid" through rules
       $order->data['webform'][] = array(
         'nid' => $form['#node']->nid,
         'sid' => $form_state['values']['details']['sid'],
       );
-      
+
       // Wrap the order to simplify manipulating its field data.
       $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
 
@@ -328,15 +327,16 @@ function webform_commerce_submit(&$form, &$form_state) {
               'currency_code' => 'USD',
               'data' => array(),
             );
+
             $new_line_item = webform_commerce_line_item_new($unit_price, $line_item->order_id, NULL, $option['details']);
-            
+
             commerce_line_item_save($new_line_item);
             // Add the line item to the order using the wrapper.
             $order_wrapper->commerce_line_items[] = $new_line_item;
           }
         }
-
       }
+
       // Save the order again to update its line item reference field.
       commerce_order_save($order);
       drupal_set_message(t('Congrats'), 'status');
@@ -371,7 +371,7 @@ function webform_commerce_line_item_new($unit_price, $order_id = 0, $data = arra
 
   // Populate it with the product information.
   webform_commerce_line_item_populate($line_item, $unit_price, $details);
-  
+
   // Return the line item.
   return $line_item;
 }
@@ -385,10 +385,10 @@ function webform_commerce_line_item_new($unit_price, $order_id = 0, $data = arra
  *   The fully loaded product referenced by the line item.
  */
 function webform_commerce_line_item_populate($line_item, $unit_price, $details = array()) {
-  
+
   // Set the label to be the product SKU.
   $line_item->line_item_label = $details['name'];
-  
+
   // $line_item->data['webform_component'] = $details;
 
   // Wrap the line item and product to easily set field information.
