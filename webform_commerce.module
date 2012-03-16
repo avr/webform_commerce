@@ -6,6 +6,13 @@
  */
 
 /**
+* Implements hook_enable() to provide a new line item type.
+*/
+function commerce_installments_enable() {
+  commerce_product_line_item_configuration('webform_commerce');
+}
+
+/**
  * Implements hook_commerce_line_item_type_info().
  *
  * @see hook_commerce_line_item_type_info().
@@ -16,7 +23,7 @@ function webform_commerce_commerce_line_item_type_info() {
 
   $line_item_types['webform_commerce'] = array(
     'name' => t('Webform extra fee'),
-    'description' => t('Simplest Example Line Item Type'),
+    'description' => t('Line item type for webform submissions'),
     'product' => FALSE,
     // Here you can change the text in the submit button in the order admin form.
     'add_form_submit_value' => t('Add webform extra charge'),
@@ -331,18 +338,6 @@ function webform_commerce_submit(&$form, &$form_state) {
             $line_item->data['webform_price_components'][] = $option;
             commerce_line_item_save($line_item);
 
-            $unit_price = array(
-              'amount' => $option['amount'],
-              'currency_code' => 'USD',
-              'data' => array(),
-            );
-
-            $new_line_item = webform_commerce_line_item_new($unit_price, $line_item->order_id, NULL, $option['details']);
-
-            commerce_line_item_save($new_line_item);
-
-            // Add the line item to the order using the wrapper.
-            $order_wrapper->commerce_line_items[] = $new_line_item;
           }
         }
       }
@@ -353,69 +348,6 @@ function webform_commerce_submit(&$form, &$form_state) {
     }
     else {
       drupal_set_message(t('%title could not be added to your cart.', array('%title' => $product->title)), 'error');
-    }
-  }
-}
-
-/**
- * Creates a new webform_commerce line item populated values.
- *
- * @param $unit_price
- * @param $order_id
- *   The ID of the order the line item belongs to (if available).
- * @param $data
- *   A data array to set on the new line item.
- *
- * @return
- *   The fully loaded line item populated with the product data as specified.
- */
-function webform_commerce_line_item_new($unit_price, $order_id = 0, $data = array(), $details = array()) {
-  $type = 'webform_commerce';
-
-  // Create the new line item.
-  $line_item = entity_create('commerce_line_item', array(
-    'type' => $type,
-    'order_id' => $order_id,
-    'data' => $data,
-  ));
-
-  // Populate it with the product information.
-  webform_commerce_line_item_populate($line_item, $unit_price, $details);
-
-  // Return the line item.
-  return $line_item;
-}
-
-/**
- * Populates an existing product line item with the product and quantity data.
- *
- * @param $line_item
- *   The fully loaded line item object, populated by reference.
- * @param $product
- *   The fully loaded product referenced by the line item.
- */
-function webform_commerce_line_item_populate($line_item, $unit_price, $details = array()) {
-
-  // Set the label to be the product SKU.
-  $line_item->line_item_label = $details['name'];
-
-  // $line_item->data['webform_component'] = $details;
-
-  // Wrap the line item and product to easily set field information.
-  $line_item_wrapper = entity_metadata_wrapper('commerce_line_item', $line_item);
-
-  $line_item->commerce_unit_price['und'][] = $unit_price;
-
-  if (!is_null($line_item_wrapper->commerce_unit_price->value())) {
-    // Add the base price to the components array.
-    if (!commerce_price_component_load($line_item_wrapper->commerce_unit_price->value(), 'webform_fee')) {
-      $line_item_wrapper->commerce_unit_price->data = commerce_price_component_add(
-        $unit_price,
-        'base_price',
-        $unit_price,
-        FALSE,
-        FALSE
-      );
     }
   }
 }

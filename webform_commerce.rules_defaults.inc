@@ -21,7 +21,29 @@ function webform_commerce_default_rules_configuration() {
       'commerce_order' => 'commerce_order',
       ));
 
-  $rules['rules_update_webform_to_paid'] = $rule;
- 
- return $rules;
+  $rules['update_webform_to_paid'] = $rule;
+  
+  $rule = entity_import('rules_config', '{
+    "update_webform_commerce_price" : {
+      "LABEL" : "Update price of webform submission",
+      "PLUGIN" : "reaction rule",
+      "REQUIRES" : [ "webform_commerce", "commerce_product_reference" ],
+      "ON" : [ "commerce_product_calculate_sell_price" ],
+      "IF" : [
+        { "webform_contains_pricing_components" : { "commerce_line_item" : [ "commerce_line_item" ] } }
+      ],
+      "DO" : [
+        { "webform_commerce_calculate_price" : {
+            "commerce_line_item" : [ "commerce_line_item" ],
+            "component_name" : "webform_fee",
+            "round_mode" : "1"
+          }
+        }
+      ]
+    }
+  }');
+  
+  $rules['add_components_to_line_item'] = $rule;
+  
+  return $rules;
 }
