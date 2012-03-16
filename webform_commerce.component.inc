@@ -31,6 +31,7 @@ function _webform_defaults_commerce() {
  * Implements _webform_edit_component().
  */
 function _webform_edit_commerce($component) {
+  dsm($component);
   
   $form = array();
 
@@ -137,27 +138,67 @@ function _webform_edit_commerce($component) {
   );
   
   $price_components = webform_component_list($node, 'price', FALSE, FALSE);
-  
+
   $form['extra']['price_components'] = array(
-    '#type' => 'select',
-    '#title' => t('Price components'),
-    '#options' => $price_components,
-    '#default_value' => $component['extra']['price_components'],
-    '#multiple' => TRUE,
-    '#size' => 10,
-    '#description' => t('Select the components that contain price values. These can be either "select" or "textfield" items. Each of these components will be added as a line item in the user\'s cart.'),
-    '#process' => array('webform_component_select'),
-    '#collapsible' => FALSE,
+    '#type' => 'fieldset',
+    '#title' => t('Additional pricing'),
+    '#description' => t('Select the components that contain price values. These can be either "select" or "textfield" items. Each of these components will be added to the amount of the base product.'),
+    '#collapsible' => TRUE,
     '#collapsed' => FALSE,
-    '#all_checkbox' => FALSE,
   );
-  
+
+  // $commerce_cid = $node->webform_commerce_cid;
+  // $commerce_component = $node->webform['components'][$commerce_cid];
+
+  foreach($price_components as $pc => $pc_title) {
+    $extra_price = $component['extra']['price_components'];
+
+    $form['extra']['price_components'][$pc] = array(
+      '#type' => 'container',
+    );
+
+    $default_value = isset($extra_price[$pc]) ? $extra_price[$pc]['expense'] : NULL;
+
+    $form['extra']['price_components'][$pc]['expense'] = array(
+      '#type' => 'checkbox',
+      '#title' => $pc_title,
+      '#default_value' => $default_value,
+    );
+
+    $component_value = $node->webform['components'][$pc];
+
+    if ($component_value['type'] == 'select') {
+      //  Reusable states
+      $add_price = array(
+        'visible' => array(
+          '#edit-extra-price-components-' . $pc . '-expense' => array('checked' => TRUE),
+        ),
+      );
+
+      $options = _webform_select_options($component_value);
+
+      foreach($options as $option => $title) {
+
+        $option_value = isset($extra_price[$pc]) ? $extra_price[$pc]['amount'][$option] : NULL;
+
+        $form['extra']['price_components'][$pc]['amount'][$option] = array(
+          '#type' => 'textfield',
+          '#title' => $title,
+          '#size' => 10,
+          '#field_prefix' => "$",
+          '#default_value' => $option_value,
+          '#states' => $add_price,
+        );
+      }
+    }
+  }
+
   return $form;
 }
 
 function _webform_edit_commerce_update_pricing(&$form, $form_state) {
   $commands = array();
-  
+
   // Adjust the display of the main "Total"
   $product = commerce_product_load_by_sku($form_state['input']['extra']['pricing']['product_to_add']);
   $wrapper = entity_metadata_wrapper('commerce_product', $product);
@@ -165,7 +206,7 @@ function _webform_edit_commerce_update_pricing(&$form, $form_state) {
   $currency_code = 'USD';
   
   $commands[] = ajax_command_html("#amount .cost", commerce_currency_format($amount, $currency_code));
-  
+
   return array('#type' => 'ajax', '#commands' => $commands);
 }
 
@@ -205,7 +246,7 @@ function _webform_render_commerce($component, $value = NULL, $filter = TRUE) {
     '#webform_component' => $component,
     '#theme_wrapper' => array('webform_element'),
   );
-  
+
   return $element;
 }
 

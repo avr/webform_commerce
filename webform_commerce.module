@@ -54,7 +54,6 @@ function webform_commerce_webform_component_info() {
  * Implements hook_webform_component_info_alter().
  * 
  * Taken directly from webform_pay
- *
  */
 function webform_commerce_webform_component_info_alter(&$components) {
   // Allow components of these types to be used as a price field.
@@ -98,13 +97,12 @@ function webform_commerce_node_load($nodes, $types) {
   foreach ($result as $nid => $cid) {
     $nodes[$nid]->webform_commerce_cid = $cid;
   }
-  
 }
 
 /**
  * Implements hook_form_alter().
  * 
- * Inspired by from webform_pay
+ * Inspired by webform_pay
  */
 function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
   if (preg_match('/^webform_client_form_\d+$/', $form_id) && isset($form['#node']->webform_commerce_cid)) {
@@ -114,19 +112,21 @@ function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
     $commerce_cid = $node->webform_commerce_cid;
     $commerce_comp = $node->webform['components'][$commerce_cid];
 
+    $wfc = "webform_commerce";
+
     if ($product = commerce_product_load_by_sku($commerce_comp['extra']['pricing']['product_to_add'])) {
       $amount = commerce_product_calculate_sell_price($product);
       $currency_code = $amount['currency_code'];
-      $form_state['wfc']['base_price'] = $amount;
-      $form_state['wfc']['product_id'] = $product->product_id;
+      $form_state[$wfc]['base_price'] = $amount;
+      $form_state[$wfc]['product_id'] = $product->product_id;
     }
 
-    $total = !isset($form_state['wfc']['total']) ? $amount['amount'] : $form_state['wfc']['total'];
+    $total = !isset($form_state[$wfc]['total']) ? $amount['amount'] : $form_state[$wfc]['total'];
 
     // Add a class to add positioning to the form
     $form['#attributes']['class'][] = 'commerce-webform';
 
-    // Check for submission so this only used on initial webform creation
+    // Check for submission so this is used only on initial webform creation
     if (empty($form['#submission']->sid)) {
       
       // Create the "Total:" and Line Item box
@@ -143,14 +143,15 @@ function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
       // add ajax for each price component
       
       foreach ($commerce_comp['extra']['price_components'] as $cid => $enabled) {
-        if ($enabled && isset($node->webform['components'][$cid])) {
+        
+        if ($enabled && $enabled['expense']) {
 
           $price_component = $node->webform['components'][$cid];
           $parent_keys = webform_component_parent_keys($node, $price_component);
 
           foreach ($parent_keys as $form_key) {
             $title = $price_component['name'];
-            $options = isset($form_state['wfc']['options']) ? $form_state['wfc']['options'] : NULL;
+            $options = isset($form_state[$wfc]['options']) ? $form_state[$wfc]['options'] : NULL;
             $value = isset($options[$form_key]['amount']) ? $options[$form_key]['amount'] : (int) 0;
 
             $form['cost'][$form_key] = array(
@@ -180,19 +181,21 @@ function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
 
 /**
  * Ajax callback to adjust the price display
+ *
+ * Called after webform_commerce_validate. Values come via validation
  */
 function webform_commerce_price_adjust(&$form, $form_state) {
   $commands = array();
 
   // Adjust the display of the main "Total"
-  $total = $form_state['wfc']['total'];
-  $currency_code = $form_state['wfc']['base_price']['currency_code'];
+  $total = $form_state['webform_commerce']['total'];
+  $currency_code = $form_state['webform_commerce']['base_price']['currency_code'];
 
   $amount = commerce_currency_format($total, $currency_code);
   $commands[] = ajax_command_html("#cost_heading", $amount);
 
   // Adjust the display value of each line item
-  $items = $form_state['wfc']['options'];
+  $items = $form_state['webform_commerce']['options'];
 
   foreach($items as $k => $v) {
     $line_item_amount = commerce_currency_format($v['amount'], 'USD');
@@ -205,14 +208,15 @@ function webform_commerce_price_adjust(&$form, $form_state) {
 /**
  * After build function for webform_commerce_form_alter.
  *
- * Inspired by from webform_pay
+ * Inspired by webform_pay
  */
 function webform_commerce_after_build($form) {
+
   // If editing a submission, do NOT reprocess add to cart/validate functions.
   if (!empty($form['#submission']->sid)) {
     $submit_index = array_search('webform_commerce_submit', $form['#submit']);
     $validate_index = array_search('webform_commerce_validate', $form['#validate']);
-    
+
     if ($submit_index !== FALSE) {
       unset($form['#submit'][$submit_index]);
     }
@@ -239,35 +243,39 @@ function webform_commerce_validate(&$form, &$form_state) {
   $commerce_component = $node->webform['components'][$commerce_cid];
 
   // Add up all the components that contain price values.
-  $total = $form_state['wfc']['base_price']['amount'];
+  $total = $form_state['webform_commerce']['base_price']['amount'];
   
   foreach ($commerce_component['extra']['price_components'] as $cid => $enabled) {
-    if ($enabled && isset($node->webform['components'][$cid])) {
+    if ($enabled && $enabled['expense'] == '1') {
       $price_component = $node->webform['components'][$cid];
-      
+
       // Find the price value if on the current page.
-      $price_value = _webform_commerce_component_value($node, $price_component, $form_state['values']['submitted'], TRUE);
-      
+      $price_key = _webform_commerce_component_value($node, $price_component, $form_state['values']['submitted'], TRUE);
+
       // Find the price value from any previous pages.
-      if ($price_value === FALSE && isset($form_state['storage']['submitted'])) {
-        $price_value = _webform_commerce_component_value($node, $price_component, $form_state['storage']['submitted']);
+      if (empty($price_key) && isset($form_state['storage']['submitted'])) {
+        $price_key = _webform_commerce_component_value($node, $price_component, $form_state['storage']['submitted']);
       }
-      
+
       $form_key = $price_component['form_key'];
-      $form_state['wfc']['options'][$form_key]['amount'] = (float) $price_value * 100;
-      $form_state['wfc']['options'][$form_key]['details'] = $price_component;
+
+      $option_amount = isset($enabled['amount'][$price_key]) ? $enabled['amount'][$price_key] : '';
+
+      $form_state['webform_commerce']['options'][$form_key]['amount'] = (float) $option_amount * 100;
+      $form_state['webform_commerce']['options'][$form_key]['details'] = $price_component;
       
       $price_parents = webform_component_parent_keys($node, $price_component);
-      if (!empty($price_value) && !is_numeric($price_value)) {
+      
+      if (!empty($option_amount) && !is_numeric($option_amount)) {
         form_set_error('submitted][' . implode('][', $price_parents), t('The value for @name needs to be a valid amount.', array('@name' => $price_component['name'])));
       }
       else {
-        $total += (float) $price_value * 100;
+        $total += (float) $option_amount * 100;
       }
     }
   }
 
-  $form_state['wfc']['total'] = $total;
+  $form_state['webform_commerce']['total'] = $total;
 
   // Set the total for the webform.
   $form_state['values']['webform_commerce']['total'] = $total;
@@ -296,9 +304,9 @@ function webform_commerce_submit(&$form, &$form_state) {
   if (!empty($form_state['values']['details']['sid'])) {
     global $user;
 
-    if (isset($form_state['wfc']['product_id'])) {
+    if (isset($form_state['webform_commerce']['product_id'])) {
       // $product_id = $form_state['values']['product_id'];
-      $product_id = $form_state['wfc']['product_id'];
+      $product_id = $form_state['webform_commerce']['product_id'];
       $quantity = '1';
       $combine = FALSE;
     }
@@ -315,9 +323,10 @@ function webform_commerce_submit(&$form, &$form_state) {
       // Wrap the order to simplify manipulating its field data.
       $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
 
-      if (isset($form_state['wfc']['options'])) {
-        foreach ($form_state['wfc']['options'] as $option) {
+      if (isset($form_state['webform_commerce']['options'])) {
+        foreach ($form_state['webform_commerce']['options'] as $option) {
           if ($option['amount'] > 0) {
+
             // Add a reference for each pricing option to the main line item
             $line_item->data['webform_price_components'][] = $option;
             commerce_line_item_save($line_item);
@@ -331,6 +340,7 @@ function webform_commerce_submit(&$form, &$form_state) {
             $new_line_item = webform_commerce_line_item_new($unit_price, $line_item->order_id, NULL, $option['details']);
 
             commerce_line_item_save($new_line_item);
+
             // Add the line item to the order using the wrapper.
             $order_wrapper->commerce_line_items[] = $new_line_item;
           }
