@@ -8,7 +8,7 @@
 /**
 * Implements hook_enable() to provide a new line item type.
 */
-function commerce_installments_enable() {
+function webform_commerce_enable() {
   commerce_product_line_item_configuration('webform_commerce');
 }
 
@@ -16,15 +16,15 @@ function commerce_installments_enable() {
  * Implements hook_commerce_line_item_type_info().
  *
  * @see hook_commerce_line_item_type_info().
- * @see http://www.drupalcommerce.org/specification/info-hooks/checkout
+ * @see http://www.drupalcommerce.org/specification/info-hooks/line-item
  *
  */
 function webform_commerce_commerce_line_item_type_info() {
 
   $line_item_types['webform_commerce'] = array(
-    'name' => t('Webform extra fee'),
+    'name' => t('Webform fee'),
     'description' => t('Line item type for webform submissions'),
-    'product' => FALSE,
+    'product' => TRUE,
     // Here you can change the text in the submit button in the order admin form.
     'add_form_submit_value' => t('Add webform extra charge'),
     'base' => 'webform_commerce_line_item',
@@ -318,36 +318,46 @@ function webform_commerce_submit(&$form, &$form_state) {
       $combine = FALSE;
     }
 
-    if ($line_item = commerce_cart_product_add_by_id($product_id, $quantity, $combine, $user->uid)) {
-      $order = commerce_order_load($line_item->order_id);
-
-      // Add webform details to the order. This allows for marking the webform "paid" through rules
-      $order->data['webform'][] = array(
-        'nid' => $form['#node']->nid,
-        'sid' => $form_state['values']['details']['sid'],
+    if ($product = commerce_product_load($product_id)) {
+      $data = array(
+        'context' => array(
+          'display_path' => 'node/3',
+        ),
       );
+      // Create a new product line item for it.
+      $line_item_to_cart = commerce_product_line_item_new($product, $quantity, 0, $data, 'webform_commerce');
 
-      // Wrap the order to simplify manipulating its field data.
-      $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
+      if ($line_item = commerce_cart_product_add($user->uid, $line_item_to_cart, $combine)) {
+        $order = commerce_order_load($line_item->order_id);
 
-      if (isset($form_state['webform_commerce']['options'])) {
-        foreach ($form_state['webform_commerce']['options'] as $option) {
-          if ($option['amount'] > 0) {
+        // Add webform details to the order. This allows for marking the webform "paid" through rules
+        $order->data['webform'][] = array(
+          'nid' => $form['#node']->nid,
+          'sid' => $form_state['values']['details']['sid'],
+        );
 
-            // Add a reference for each pricing option to the main line item
-            $line_item->data['webform_price_components'][] = $option;
-            commerce_line_item_save($line_item);
+        // Wrap the order to simplify manipulating its field data.
+        $order_wrapper = entity_metadata_wrapper('commerce_order', $order);
 
+        if (isset($form_state['webform_commerce']['options'])) {
+          foreach ($form_state['webform_commerce']['options'] as $option) {
+            if ($option['amount'] > 0) {
+
+              // Add a reference for each pricing option to the main line item
+              $line_item->data['webform_price_components'][] = $option;
+              commerce_line_item_save($line_item);
+
+            }
           }
         }
-      }
 
-      // Save the order again to update its line item reference field.
-      commerce_order_save($order);
-      drupal_set_message(t('Congrats'), 'status');
-    }
-    else {
-      drupal_set_message(t('%title could not be added to your cart.', array('%title' => $product->title)), 'error');
+        // Save the order again to update its line item reference field.
+        commerce_order_save($order);
+        drupal_set_message(t('Congrats'), 'status');
+      }
+      else {
+        drupal_set_message(t('%title could not be added to your cart.', array('%title' => $product->title)), 'error');
+      }
     }
   }
 }
