@@ -352,9 +352,11 @@ function webform_commerce_submit(&$form, &$form_state) {
     }
 
     if ($product = commerce_product_load($product_id)) {
+      $nid = $form['#node']->nid;
+      $sid = $form_state['values']['details']['sid'];
       $data = array(
         'context' => array(
-          'display_path' => 'node/3',
+          'display_path' => 'node/' . $nid . '/submission/' . $sid,
         ),
       );
       // Create a new product line item for it.
@@ -365,8 +367,8 @@ function webform_commerce_submit(&$form, &$form_state) {
 
         // Add webform details to the order. This allows for marking the webform "paid" through rules
         $order->data['webform'][] = array(
-          'nid' => $form['#node']->nid,
-          'sid' => $form_state['values']['details']['sid'],
+          'nid' => $nid,
+          'sid' => $sid,
         );
 
         // Wrap the order to simplify manipulating its field data.
