@@ -31,8 +31,7 @@ function _webform_defaults_commerce() {
  * Implements _webform_edit_component().
  */
 function _webform_edit_commerce($component) {
-  dsm($component);
-  
+
   $form = array();
 
   $form['extra']['description'] = array(
@@ -84,8 +83,6 @@ function _webform_edit_commerce($component) {
     '#title' => t('Product to place in the order'),
     '#description' => t('This product will be added to the cart when the user clicks the "Submit" button on the form.'),
     '#default_value' => $component['extra']['pricing']['product_to_add'],
-    // Here we're using Commerce Product's autocomplete path in an unusual way
-    // just to get a product for the form.
     '#autocomplete_path' => 'commerce_product/autocomplete/any/any/any',
     '#required' => TRUE,
     '#ajax' => array(
@@ -146,9 +143,6 @@ function _webform_edit_commerce($component) {
     '#collapsible' => TRUE,
     '#collapsed' => FALSE,
   );
-
-  // $commerce_cid = $node->webform_commerce_cid;
-  // $commerce_component = $node->webform['components'][$commerce_cid];
 
   foreach($price_components as $pc => $pc_title) {
     $extra_price = $component['extra']['price_components'];
@@ -237,9 +231,6 @@ function webform_commerce_form_webform_component_edit_form_alter(&$form, &$form_
  * Implements _webform_render_component().
  */
 function _webform_render_commerce($component, $value = NULL, $filter = TRUE) {
-  // This is a merely a placeholder element, since pay forms need to be located
-  // at a specific location in the form. This will be populated with the actual
-  // form in webform_pay_prerender().
   $element = array(
     '#value' => $value,
     '#weight' => $component['weight'],

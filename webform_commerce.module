@@ -76,9 +76,42 @@ function webform_commerce_webform_component_info_alter(&$components) {
 function webform_commerce_webform_component_presave(&$component) {
   // Create a new product if necessary
   if ($component['type'] == 'commerce') {
-    // Update the component with the new product_sku
-    // $component['extra']['pricing']['product_to_add'] = 'special_test';
+    $pricing = $component['extra']['pricing'];
+    if ($pricing['type'] === 'new') {
+      $new_product = _webform_commerce_create_product($pricing);
+      $component['extra']['pricing']['product_to_add'] = $new_product->sku;
+      $component['extra']['pricing']['type'] = 'ref';
+    }
+    unset($component['extra']['product_type']);
+    unset($component['extra']['product_title']);
+    unset($component['extra']['product_sku']);
+    unset($component['extra']['product_price']);
   }
+}
+
+/**
+ * Create a new product from a webform component
+ */
+function _webform_commerce_create_product($pricing) {
+  // Generate a new product object
+  $new_product = commerce_product_new($pricing['product_type']);
+
+  $new_product->status = TRUE;
+  $new_product->uid = $GLOBALS['user']->uid;
+
+  $new_product->sku = $pricing['product_sku'];
+  $new_product->title = $pricing['product_title'];
+  $new_product->created = $new_product->changed = time();
+
+  $price = array(LANGUAGE_NONE => array(0 => array(
+    'amount' => $pricing['product_price'] * 100,
+    'currency_code' => commerce_default_currency(),
+  )));
+  
+  $new_product->commerce_price = $price;
+
+  commerce_product_save($new_product);
+  return $new_product;
 }
 
 /**
