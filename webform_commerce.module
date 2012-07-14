@@ -8,9 +8,10 @@
 /**
 * Implements hook_enable() to provide a new line item type.
 */
-function webform_commerce_enable() {
-  commerce_product_line_item_configuration('webform_commerce');
-}
+// function webform_commerce_enable() {
+//   commerce_product_line_item_configuration('webform_commerce');
+//   // commerce_line_item_configure_line_item_types();
+// }
 
 /**
  * Implements hook_commerce_line_item_type_info().
@@ -27,7 +28,10 @@ function webform_commerce_commerce_line_item_type_info() {
     'product' => TRUE,
     // Here you can change the text in the submit button in the order admin form.
     'add_form_submit_value' => t('Add webform extra charge'),
-    'base' => 'webform_commerce_line_item',
+    'base' => 'commerce_product_line_item',
+    'callbacks' => array(
+      'title' => 'webform_commerce_line_item_title',
+    ),
   );
 
   return $line_item_types;

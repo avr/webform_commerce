@@ -109,6 +109,7 @@ function webform_commerce_update_status($order) {
 
 function webform_commerce_calculate_price($line_item, $component_name, $round_mode) {
   $added_fees = '';
+  
   foreach($line_item->data['webform_price_components'] as $item) {
     $added_fees += $item['amount'];
   }

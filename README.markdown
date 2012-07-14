@@ -1,14 +1,14 @@
 A Drupal 7 Webform Component which does the following:
 
 1. Creates a commerce line item type: "Webform fee"
-2. Creates a webform component: "Commerce payment"
+2. Creates a Webform component: "Commerce payment"
 
 Creates rules which do the following:
 
-1. After submitting the form, calculates the total cost
+1. After submitting the Webform, calculates the total cost
 2. After checkout is complete:
-   * Retrieves the webform submission id (sid) from the submitted webform
-   * Changes the status of the webform from "unpaid" to "paid"
+   * Retrieves the Webform submission id (sid) from the submitted webform
+   * Changes the status of the Webform from "unpaid" to "paid"
 
 ##FEATURES
 * Simple setup for event registrations
@@ -29,8 +29,8 @@ Creates rules which do the following:
    * This is done by editing the "Filter" of each cart view.
 
 ##TODO
-1. Add form handlers to the "remove" button in commerce cart/review for the extra line items
-2. Add some kind of handler to "edit" the webform from the cart
-3. ~~Add product creation to the webform component itself - eliminating the need to set up the product separately.~~
+1. Add form handlers to the "remove" button in Commerce cart/review for the extra line items
+2. Add some kind of handler to "edit" the Webform from the cart
+3. ~~Add product creation to the Webform component itself - eliminating the need to set up the product separately.~~
 4. Update the Cart views on install
 
