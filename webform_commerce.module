@@ -29,8 +29,16 @@ function webform_commerce_commerce_line_item_type_info() {
   return $line_item_types;
 }
 
+/**
+ * Returns an appropriate title for this line item
+ */
+
 function webform_commerce_line_item_title($line_item) {
-  return $line_item->line_item_label;
+  // Taken from commerce_product_reference.module
+  // @TODO: alter this to be an option in the webform compenent - i.e. take a text field (name)
+  if ($product = entity_metadata_wrapper('commerce_line_item', $line_item)->commerce_product->value()) {
+    return check_plain($product->title);
+  }
 }
 
 /**

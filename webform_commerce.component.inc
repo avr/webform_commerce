@@ -286,26 +286,23 @@ function _webform_submit_commerce($component, $value) {
  */
 function _webform_display_commerce($component, $value, $format) {
   $element = array(
-    '#title' => $component['name'],
+    '#title' => t('Status and cost'),
     '#weight' => $component['weight'],
     '#format' => $format,
-    // '#theme' => 'webform_display_address',
     '#theme_wrappers' => $format == 'html' ? array('webform_element') : array('webform_element_text'),
     '#sorted' => TRUE,
     '#webform_component' => $component,
     '#value' => $value,
     'status' => array(
       '#type' => 'item',
-      '#title' => t('Status'),
-      '#markup' => $value['status'],
+      '#markup' => '<strong>' . t('Status: ') . '</strong>' . $value['status'],
     ),
     'amount' => array(
       '#type' => 'item',
-      '#title' => t('Amount'),
-      '#markup' => commerce_currency_format($value['total'], 'USD'),
+      '#markup' => '<strong>' . t('Amount: ') . '</strong>'. commerce_currency_format($value['total'], 'USD'),
     ),
   );
-  
+
   return $element;
 }
 

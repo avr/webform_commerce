@@ -1,7 +1,7 @@
 A Drupal 7 Webform Component which does the following:
 
-1. Creates a commerce line item type: "Webform fee"
-2. Creates a Webform component: "Commerce payment"
+1. Creates a commerce line item type: "Webform Commerce"
+2. Creates a Webform component: "Commerce product"
 
 Creates rules which do the following:
 
