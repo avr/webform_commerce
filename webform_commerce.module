@@ -6,14 +6,6 @@
  */
 
 /**
-* Implements hook_enable() to provide a new line item type.
-*/
-// function webform_commerce_enable() {
-//   commerce_product_line_item_configuration('webform_commerce');
-//   // commerce_line_item_configure_line_item_types();
-// }
-
-/**
  * Implements hook_commerce_line_item_type_info().
  *
  * @see hook_commerce_line_item_type_info().
@@ -68,9 +60,9 @@ function webform_commerce_webform_component_info() {
  */
 function webform_commerce_webform_component_info_alter(&$components) {
   // Allow components of these types to be used as a price field.
-  $components['textfield']['features']['price'] = TRUE;
+  // $components['textfield']['features']['price'] = TRUE;
   $components['select']['features']['price'] = TRUE;
-  $components['hidden']['features']['price'] = TRUE;
+  // $components['hidden']['features']['price'] = TRUE;
 }
 
 
@@ -181,7 +173,7 @@ function webform_commerce_form_alter(&$form, &$form_state, $form_id) {
       $form['cost']['title'] = array(
         '#type' => 'item',
         '#title' => t('Total:'),
-        '#markup' => "<span id='cost_heading'>" . commerce_currency_format($total, $currency_code ) . "</span>",
+        '#markup' => "<span id='cost_heading'>" . commerce_currency_format($total, $currency_code) . "</span>",
       );
       
       // add ajax for each price component

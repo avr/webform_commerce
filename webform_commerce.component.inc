@@ -139,7 +139,7 @@ function _webform_edit_commerce($component) {
   $form['extra']['price_components'] = array(
     '#type' => 'fieldset',
     '#title' => t('Additional pricing'),
-    '#description' => t('Select the components that contain price values. These can be either "select" or "textfield" items. Each of these components will be added to the amount of the base product.'),
+    '#description' => t('Select the components that will effect the price.  Each of these components will be added to the amount of the base product.'),
     '#collapsible' => TRUE,
     '#collapsed' => FALSE,
   );
