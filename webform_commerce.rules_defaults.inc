@@ -10,19 +10,21 @@
  
 function webform_commerce_default_rules_configuration() {
   $rules = array();
-  
-  $rule = rules_reaction_rule();
-  $rule->label = t("Update Webform Submission to Paid");
-  $rule->active = TRUE;
 
-  $rule
-    ->event('commerce_checkout_complete')
-    ->action('webform_commerce_update_status', array(
-      'commerce_order' => 'commerce_order',
-      ));
+  $rule = entity_import('rules_config', '{
+    "update_webform_to_paid" : {
+      "LABEL" : "Update Webform Submission to Paid",
+      "PLUGIN" : "reaction rule",
+      "REQUIRES" : [ "webform_commerce", "commerce_checkout" ],
+      "ON" : [ "commerce_checkout_complete" ],
+      "DO" : [
+        { "webform_commerce_update_status" : { "commerce_order" : [ "commerce-order" ] } }
+      ]
+    }
+  }');
 
   $rules['update_webform_to_paid'] = $rule;
-  
+
   $rule = entity_import('rules_config', '{
     "update_webform_commerce_price" : {
       "LABEL" : "Update price of webform submission",
@@ -42,8 +44,8 @@ function webform_commerce_default_rules_configuration() {
       ]
     }
   }');
-  
+
   $rules['add_components_to_line_item'] = $rule;
-  
+
   return $rules;
 }

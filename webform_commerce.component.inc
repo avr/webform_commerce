@@ -39,8 +39,10 @@ function _webform_edit_commerce($component) {
     '#value' => '',
   );
   
+  $form['display'] = array('#type' => 'markup'); // Hide the display options.
+
   $node = node_load($component['nid']);
-  
+
   $form['extra']['pricing'] = array(
     '#type' => 'fieldset',
     '#title' => t('Pricing and cost'),
@@ -84,12 +86,18 @@ function _webform_edit_commerce($component) {
     '#description' => t('This product will be added to the cart when the user clicks the "Submit" button on the form.'),
     '#default_value' => $component['extra']['pricing']['product_to_add'],
     '#autocomplete_path' => 'commerce_product/autocomplete/any/any/any',
-    '#required' => TRUE,
     '#ajax' => array(
       'callback' => '_webform_edit_commerce_update_pricing',
       'wrapper' => 'amount',
     ),
-    '#states' => $ref_product,
+    '#states' => array(
+      'visible' => array(
+        '#edit-extra-pricing-type' => array('value' => 'ref'),
+      ),
+      'required' => array(
+        '#edit-extra-pricing-type' => array('value' => 'ref'),
+      ),
+    ),
   );
   
   $form['extra']['pricing']['amount'] = array(
@@ -193,15 +201,17 @@ function _webform_edit_commerce($component) {
 function _webform_edit_commerce_update_pricing(&$form, $form_state) {
   $commands = array();
 
-  // Adjust the display of the main "Total"
-  $product = commerce_product_load_by_sku($form_state['input']['extra']['pricing']['product_to_add']);
-  $wrapper = entity_metadata_wrapper('commerce_product', $product);
-  $amount = $wrapper->commerce_price->amount->value();
-  $currency_code = 'USD';
-  
-  $commands[] = ajax_command_html("#amount .cost", commerce_currency_format($amount, $currency_code));
+  // Adjust the display of the "Current base price"
+  if ($product = commerce_product_load_by_sku($form_state['input']['extra']['pricing']['product_to_add'])) {
+    $wrapper = entity_metadata_wrapper('commerce_product', $product);
+    $amount = $wrapper->commerce_price->amount->value();
+    $currency_code = 'USD';
 
-  return array('#type' => 'ajax', '#commands' => $commands);
+    $commands[] = ajax_command_html("#amount .cost", commerce_currency_format($amount, $currency_code));
+
+    return array('#type' => 'ajax', '#commands' => $commands);
+
+  }
 }
 
 function webform_commerce_form_webform_component_edit_form_alter(&$form, &$form_state, $form_id) {
