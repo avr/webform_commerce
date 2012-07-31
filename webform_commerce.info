@@ -17,8 +17,13 @@ files[] = webform_commerce.module
 
 ; Module dependencies
 dependencies[] = webform
-; dependencies[] = theirmodule (1.2)
-; dependencies[] = anothermodule (>=2.4)
+dependencies[] = commerce
+dependencies[] = commerce_line_item
+dependencies[] = commerce_product
+dependencies[] = commerce_product_pricing
+dependencies[] = commerce_product_reference
+dependencies[] = entity
+dependencies[] = rules
 ; dependencies[] = views (3.x)
 
 ; Stylesheets
